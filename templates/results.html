@@ -1,0 +1,1203 @@
+{% extends "base.html" %}
+
+{% block title %}Scan Results - {{ results.domain }} | ARTEX{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Retro Table Styles */
+    .table-responsive {
+        border-radius: 0;
+        overflow: hidden;
+        box-shadow: 4px 4px 0 rgba(0,0,0,0.2);
+        border: 2px solid #000;
+        background-color: #f0f0f0;
+    }
+
+    .table {
+        margin-bottom: 0;
+        font-family: 'Courier New', monospace;
+    }
+
+    .table thead th {
+        border-bottom-width: 2px;
+        border-bottom-color: #000;
+        font-weight: bold;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.5px;
+        background-color: #4a6baf;
+        color: white;
+        padding: 12px 8px;
+    }
+
+    .table td {
+        border-top: 1px solid #000;
+        padding: 8px;
+    }
+
+    .table-hover tbody tr:hover {
+        background-color: rgba(74, 107, 175, 0.3);
+    }
+
+    /* Retro Progress Bar */
+    .progress {
+        border-radius: 0;
+        background-color: #e0e0e0;
+        border: 2px solid #000;
+        height: 16px;
+    }
+
+    .progress-bar {
+        font-size: 0.7rem;
+        font-weight: bold;
+        font-family: 'Courier New', monospace;
+        background-color: #4a6baf;
+        text-align: left;
+        padding-left: 8px;
+        line-height: 12px;
+    }
+
+    /* Retro Tabs */
+    .nav-tabs {
+        border-bottom: 2px solid #000;
+    }
+
+    .nav-tabs .nav-link {
+        color: #000;
+        font-weight: bold;
+        font-family: 'Courier New', monospace;
+        border: 2px solid #000;
+        border-bottom: none;
+        margin-right: 4px;
+        background-color: #e0e0e0;
+        padding: 8px 16px;
+    }
+
+    .nav-tabs .nav-link.active {
+        color: white;
+        background-color: #4a6baf;
+        border: 2px solid #000;
+        border-bottom: 2px solid #4a6baf;
+        margin-bottom: -2px;
+    }
+
+    .tab-content {
+        padding: 20px 0;
+        border-left: 2px solid #000;
+        border-right: 2px solid #000;
+        border-bottom: 2px solid #000;
+        background-color: #f0f0f0;
+    }
+
+    /* Risk Indicators */
+    .risk-critical {
+        background-color: #ffb6b6;
+        border-left: 4px solid #ff0000;
+    }
+
+    .risk-high {
+        background-color: #ffd699;
+        border-left: 4px solid #ff6600;
+    }
+
+    .risk-medium {
+        background-color: #b6d6ff;
+        border-left: 4px solid #0066ff;
+    }
+
+    /* Retro Badges */
+    .badge {
+        font-family: 'Courier New', monospace;
+        font-weight: bold;
+        border: 2px solid #000;
+        padding: 4px 8px;
+        border-radius: 0;
+        box-shadow: 2px 2px 0 rgba(0,0,0,0.2);
+    }
+
+    .badge-critical {
+        background-color: #ff0000;
+        color: white;
+    }
+
+    .badge-high {
+        background-color: #ff6600;
+        color: white;
+    }
+
+    .badge-medium {
+        background-color: #0066ff;
+        color: white;
+    }
+
+    .badge-low {
+        background-color: #00aa00;
+        color: white;
+    }
+
+    .badge-info {
+        background-color: #666666;
+        color: white;
+    }
+
+    /* Copy Button */
+    .copy-btn {
+        cursor: pointer;
+        font-family: 'Courier New', monospace;
+        background-color: #e0e0e0;
+        border: 2px solid #000;
+        padding: 2px 8px;
+        border-radius: 0;
+        box-shadow: 2px 2px 0 rgba(0,0,0,0.2);
+    }
+
+    .copy-btn:hover {
+        background-color: #4a6baf;
+        color: white;
+        transform: translate(1px, 1px);
+        box-shadow: 1px 1px 0 rgba(0,0,0,0.2);
+    }
+
+    /* Accordion */
+    .accordion-button {
+        font-family: 'Courier New', monospace;
+        font-weight: bold;
+        background-color: #e0e0e0;
+        border: 2px solid #000;
+    }
+
+    .accordion-button:not(.collapsed) {
+        background-color: #4a6baf;
+        color: white;
+        box-shadow: inset 0 -2px 0 #000;
+    }
+
+    .accordion-body {
+        border-left: 2px solid #000;
+        border-right: 2px solid #000;
+        border-bottom: 2px solid #000;
+        background-color: #f8f8f8;
+    }
+
+    /* Tech Badges */
+    .tech-badge {
+        font-size: 0.8rem;
+        margin-right: 0.3rem;
+        margin-bottom: 0.3rem;
+        font-family: 'Courier New', monospace;
+        border: 2px solid #000;
+        border-radius: 0;
+        box-shadow: 2px 2px 0 rgba(0,0,0,0.2);
+    }
+
+    .tech-category-badge {
+        font-size: 0.7rem;
+        margin-right: 0.2rem;
+        margin-bottom: 0.2rem;
+        font-family: 'Courier New', monospace;
+        border: 1px solid #000;
+        border-radius: 0;
+        box-shadow: 1px 1px 0 rgba(0,0,0,0.2);
+    }
+
+    /* Secret Snippet */
+    .secret-snippet {
+        font-family: 'Courier New', monospace;
+        background-color: #e0e0e0;
+        padding: 8px;
+        border-radius: 0;
+        font-size: 0.8rem;
+        overflow-x: auto;
+        border: 2px solid #000;
+        box-shadow: inset 2px 2px 0 rgba(0,0,0,0.1);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-5">
+        <div class="col">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="fw-bold">
+                        <i class="bi bi-bug"></i> Scan Results: {{ results.domain }}
+                    </h2>
+                    <p class="text-muted">Scan ID: {{ scan_id }} | {{ results.timestamp }}</p>
+                <div class="row mb-3">
+    <div class="col-12">
+        <div class="alert alert-info py-2">
+            <i class="bi bi-info-circle"></i> Scan options: 
+            {% if results.options.subdomains %}<span class="badge bg-primary me-1">Subdomains</span>{% endif %}
+            {% if results.options.ports %}<span class="badge bg-primary me-1">Ports</span>{% endif %}
+            {% if results.options.tech %}<span class="badge bg-primary me-1">Technologies</span>{% endif %}
+            {% if results.options.email %}<span class="badge bg-primary me-1">Emails</span>{% endif %}
+            <span class="badge bg-success me-1">Security Analysis</span>
+            <span class="badge bg-success">AI Analysis</span>
+        </div>
+    </div>
+</div>
+                </div>
+                <div>
+                    <a href="/export/{{ scan_id }}?format=pdf" class="badge bg-primary me-1">
+                        <i class="bi bi-file-earmark-pdf"></i> PDF
+                    </a>
+                    <a href="/export/{{ scan_id }}?format=json" class="badge bg-primary me-1">
+                        <i class="bi bi-filetype-json"></i> JSON
+                    </a>
+                    <a href="/" class="badge bg-primary me-1">
+                        <i class="bi bi-upc-scan"></i> New Scan
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+{% if results.ai_analysis %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-robot"></i> AI-Powered Security Insights
+                    {% if results.ai_analysis.owner_analysis.ai_model %}
+                    <span class="badge bg-info ms-2">{{ results.ai_analysis.owner_analysis.ai_model }}</span>
+                    {% endif %}
+                </h5>
+            </div>
+            <div class="card-body">
+                <!-- Owner Perspective -->
+                <div class="mb-5">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h4><i class="bi bi-shield-check"></i> Website Owner Perspective</h4>
+                        <span class="badge bg-primary">Protection Focused</span>
+                    </div>
+                    
+                    <div class="ai-response mb-4">
+                        <h5>Security Summary</h5>
+                        <p>{{ results.ai_analysis.owner_analysis.summary }}</p>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="card h-100">
+                                <div class="card-header bg-white">
+                                    <h6 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Critical Findings</h6>
+                                </div>
+                                <div class="card-body">
+                                    <ul class="list-group list-group-flush">
+                                        {% for finding in results.ai_analysis.owner_analysis.key_findings %}
+                                        <li class="list-group-item">{{ finding }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="card h-100">
+                                <div class="card-header bg-white">
+                                    <h6 class="mb-0"><i class="bi bi-lightning-charge"></i> Immediate Actions</h6>
+                                </div>
+                                <div class="card-body">
+                                    <ul class="list-group list-group-flush">
+                                        {% for action in results.ai_analysis.owner_analysis.immediate_actions %}
+                                        <li class="list-group-item">{{ action }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-header bg-white">
+                            <h6 class="mb-0"><i class="bi bi-check-circle"></i> Protection Recommendations</h6>
+                        </div>
+                        <div class="card-body">
+                            <ul class="list-group list-group-flush">
+                                {% for recommendation in results.ai_analysis.owner_analysis.protection_recommendations %}
+                                <li class="list-group-item">{{ recommendation }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Hunter Perspective -->
+                <div class="mt-5 pt-4 border-top">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h4><i class="bi bi-bug"></i> Bug Bounty Hunter Perspective</h4>
+                        <span class="badge bg-danger">Attack Focused</span>
+                    </div>
+                    
+                    <div class="ai-response mb-4">
+                        <h5>Hunting Summary</h5>
+                        <p>{{ results.ai_analysis.hunter_analysis.summary }}</p>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-header bg-white">
+                                    <h6 class="mb-0"><i class="bi bi-bullseye"></i> Promising Targets</h6>
+                                </div>
+                                <div class="card-body">
+                                    <ul class="list-group list-group-flush">
+                                        {% for target in results.ai_analysis.hunter_analysis.promising_targets %}
+                                        <li class="list-group-item">
+                                            <strong>{{ target.target }}</strong>
+                                            <div class="text-muted small">{{ target.reason }}</div>
+                                        </li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-header bg-white">
+                                    <h6 class="mb-0"><i class="bi bi-activity"></i> Attack Vectors</h6>
+                                </div>
+                                <div class="card-body">
+                                    <ul class="list-group list-group-flush">
+                                        {% for vector in results.ai_analysis.hunter_analysis.attack_vectors %}
+                                        <li class="list-group-item">
+                                            <strong>{{ vector.type }}</strong>
+                                            <div class="text-muted small">{{ vector.description }}</div>
+                                        </li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-header bg-white">
+                                    <h6 class="mb-0"><i class="bi bi-search"></i> Research Areas</h6>
+                                </div>
+                                <div class="card-body">
+                                    <ul class="list-group list-group-flush">
+                                        {% for area in results.ai_analysis.hunter_analysis.research_areas %}
+                                        <li class="list-group-item">
+                                            <strong>{{ area.technology }}</strong>
+                                            <div class="text-muted small">{{ area.note }}</div>
+                                        </li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-header bg-white">
+                            <h6 class="mb-0"><i class="bi bi-gem"></i> High Value Findings</h6>
+                        </div>
+                        <div class="card-body">
+                            <ul class="list-group list-group-flush">
+                                {% for finding in results.ai_analysis.hunter_analysis.high_value_findings %}
+                                <li class="list-group-item">{{ finding }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}    
+
+    {% if results.security_analysis %}
+    <div class="row mb-4 g-4">
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-clipboard-data"></i> Summary</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Subdomains
+                            <span class="badge rounded-pill" style="background-color: var(--primary-color); color: white;">
+                                {{ results.security_analysis.summary.total_subdomains }}
+                            </span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Active
+                            <span class="badge rounded-pill" style="background-color: var(--primary-color); color: white;">
+                                {{ results.security_analysis.summary.active_subdomains }}
+                            </span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Technologies
+                            <span class="badge rounded-pill bg-info">
+                                {{ results.tech_detection|length }}
+                            </span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-shield-exclamation"></i> Risk Assessment</h5>
+                </div>
+                <div class="card-body text-center">
+                    <div class="mb-3">
+                        <span class="badge rounded-pill py-2 px-3" style="font-size: 1.2rem; background-color: {% if results.security_analysis.risk_assessment.level|lower == 'high' %} #dc3545 {% elif results.security_analysis.risk_assessment.level|lower == 'medium' %}#ffc107{% else %}#28a745{% endif %}; color: {% if results.security_analysis.risk_assessment.level|lower == 'medium' %}black{% else %}white{% endif %}">
+                            {{ results.security_analysis.risk_assessment.level }} ({{ results.security_analysis.risk_assessment.score }}/100)
+                        </span>
+                    </div>
+                    <ul class="list-group list-group-flush mt-3">
+                        {% for factor in results.security_analysis.risk_assessment.factors[:3] %}
+                        <li class="list-group-item">{{ factor }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-lightbulb"></i> Top Insights</h5>
+                </div>
+                <div class="card-body">
+                    <div class="list-group list-group-flush">
+                        {% for insight in results.security_analysis.insights[:3] %}
+                        <div class="list-group-item">
+                            <i class="bi bi-chevron-right" style="color: var(--primary-color);"></i> {{ insight }}
+                        </div>
+                        {% endfor %}
+                        {% if results.tech_detection %}
+                        <div class="list-group-item">
+                            <i class="bi bi-chevron-right" style="color: var(--primary-color);"></i> 
+                            {{ results.tech_detection|length }} technology profiles detected
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <div class="col-12">
+            <ul class="nav nav-tabs" id="resultsTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="subdomains-tab" data-bs-toggle="tab" data-bs-target="#subdomains" type="button" role="tab">
+                        <i class="bi bi-globe"></i> Subdomains ({{ results.subdomains|length }})
+                    </button>
+                </li>
+                {% if results.port_scan %}
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="ports-tab" data-bs-toggle="tab" data-bs-target="#ports" type="button" role="tab">
+                        <i class="bi bi-plug"></i> Ports ({{ results.port_scan|length }} hosts)
+                    </button>
+                </li>
+                {% endif %}
+                {% if results.tech_detection %}
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="tech-tab" data-bs-toggle="tab" data-bs-target="#tech" type="button" role="tab">
+                        <i class="bi bi-stack"></i> Technologies
+                        <span class="badge bg-info ms-1">
+                            {{ results.tech_detection|length }}
+                        </span>
+                    </button>
+                </li>
+                {% endif %}
+                {% if results.security_analysis %}
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="targets-tab" data-bs-toggle="tab" data-bs-target="#targets" type="button" role="tab">
+                        <i class="bi bi-bullseye"></i> Targets
+                    </button>
+                </li>
+                {% endif %}
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="users-tab" data-bs-toggle="tab" data-bs-target="#users" type="button" role="tab">
+                        <i class="bi bi-people"></i> Users & Emails
+                        {% if results.email_enumeration and (results.email_enumeration.found_emails or results.email_enumeration.login_pages) %}
+                        <span class="badge bg-danger ms-1">
+                            {{ results.email_enumeration.found_emails|length + results.email_enumeration.login_pages|length }}
+                        </span>
+                        {% endif %}
+                    </button>
+                </li>
+            </ul>
+            
+            <div class="tab-content" id="resultsTabsContent">
+                <!-- Subdomains Tab -->
+                <div class="tab-pane fade show active" id="subdomains" role="tabpanel">
+                    <div class="card">
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0" id="subdomainsTable">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Subdomain</th>
+                                            <th>IP</th>
+                                            <th>HTTP</th>
+                                            <th>HTTPS</th>
+                                            <th>Title</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for subdomain in results.subdomains %}
+                                        <tr>
+                                            <td>
+                                                {% if subdomain.http_status or subdomain.https_status %}
+                                                    <a href="{% if subdomain.https_status %}https://{% else %}http://{% endif %}{{ subdomain.subdomain }}" target="_blank">
+                                                        {{ subdomain.subdomain }}
+                                                    </a>
+                                                {% else %}
+                                                    {{ subdomain.subdomain }}
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ subdomain.ip }}</td>
+                                            <td class="http-status-{{ subdomain.http_status|default('other', true)|string|slice(0,1) }}xx">
+                                                {{ subdomain.http_status|default('-') }}
+                                            </td>
+                                            <td class="http-status-{{ subdomain.https_status|default('other', true)|string|slice(0,1) }}xx">
+                                                {{ subdomain.https_status|default('-') }}
+                                            </td>
+                                            <td>{{ subdomain.title|default('')|truncate(30) }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+              <!-- Ports Tab -->
+                {% if results.port_scan %}
+                <div class="tab-pane fade" id="ports" role="tabpanel">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <input type="text" class="form-control" id="portSearch" placeholder="Search ports or services...">
+                            </div>
+                            <div class="accordion" id="portsAccordion">
+                                {% for host in results.port_scan %}
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header" id="heading{{ loop.index }}">
+                                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ loop.index }}">
+                                            <i class="bi bi-pc-display me-2"></i>
+                                            {{ host.target }} 
+                                            <span class="badge bg-primary ms-2">{{ host.ports|length }} ports</span>
+                                            {% if host.risky_ports|length > 0 %}
+                                            <span class="badge bg-danger ms-2">{{ host.risky_ports|length }} risky</span>
+                                            {% endif %}
+                                        </button>
+                                    </h2>
+                                    <div id="collapse{{ loop.index }}" class="accordion-collapse collapse" data-bs-parent="#portsAccordion">
+                                        <div class="accordion-body p-0">
+                                            <div class="table-responsive">
+                                                <table class="table table-sm mb-0">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Port</th>
+                                                            <th>Service</th>
+                                                            <th>Version</th>
+                                                            <th>Risk</th>
+                                                            <th>Vulnerabilities</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {% for port in host.ports %}
+                                                        <tr class="risk-{{ port.risk.level }}">
+                                                            <td>{{ port.port }}/{{ port.protocol }}</td>
+                                                            <td>{{ port.service }}</td>
+                                                            <td>{{ port.version|default('', true) }}</td>
+                                                            <td>
+                                                                <span class="badge badge-{{ port.risk.level }}">
+                                                                    {{ port.risk.level|upper }}
+                                                                </span>
+                                                            </td>
+                                                            <td>{{ port.risk.vulnerabilities }}</td>
+                                                        </tr>
+                                                        {% endfor %}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+
+                <!-- Technologies Tab -->
+                {% if results.tech_detection %}
+                <div class="tab-pane fade" id="tech" role="tabpanel">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="row">
+                                <!-- Technology Overview -->
+                                <div class="col-md-4">
+                                    <div class="card mb-4">
+                                        <div class="card-header bg-white">
+                                            <h5><i class="bi bi-bar-chart"></i> Technology Overview</h5>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="mb-3">
+                                                <h6>Total Technologies Detected:</h6>
+                                                <h2 class="text-primary">{{ results.tech_detection|length }}</h2>
+                                            </div>
+                                            
+                                            {% if results.tech_detection %}
+                                            <div class="mb-3">
+                                                <h6>Technologies Found:</h6>
+                                                <div class="d-flex flex-wrap">
+                                                    {% for url, tech_data in results.tech_detection.items() %}
+                                                        {% for tech in tech_data.technologies %}
+                                                            <span class="badge tech-badge bg-secondary">{{ tech.name }}</span>
+                                                        {% endfor %}
+                                                    {% endfor %}
+                                                </div>
+                                            </div>
+                                            {% endif %}
+                                            
+                                            {% if results.tech_detection %}
+                                            {% set cloud_providers = [] %}
+                                            {% for url, tech_data in results.tech_detection.items() %}
+                                                {% if tech_data.cloud and tech_data.cloud.provider not in cloud_providers %}
+                                                    {% set _ = cloud_providers.append(tech_data.cloud.provider) %}
+                                                {% endif %}
+                                            {% endfor %}
+                                            {% if cloud_providers %}
+                                            <div class="mb-3">
+                                                <h6>Cloud Providers:</h6>
+                                                {% for provider in cloud_providers %}
+                                                <span class="badge bg-info me-1 mb-1">{{ provider|upper }}</span>
+                                                {% endfor %}
+                                            </div>
+                                            {% endif %}
+                                            {% endif %}
+                                            
+                                            {% if results.tech_detection %}
+                                            {% set cdns = [] %}
+                                            {% for url, tech_data in results.tech_detection.items() %}
+                                                {% if tech_data.cdn and tech_data.cdn.provider not in cdns %}
+                                                    {% set _ = cdns.append(tech_data.cdn.provider) %}
+                                                {% endif %}
+                                            {% endfor %}
+                                            {% if cdns %}
+                                            <div>
+                                                <h6>CDN Providers:</h6>
+                                                {% for cdn in cdns %}
+                                                <span class="badge bg-secondary me-1 mb-1">{{ cdn|title }}</span>
+                                                {% endfor %}
+                                            </div>
+                                            {% endif %}
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    
+                                    {% set exposed_files = [] %}
+                                    {% for url, tech_data in results.tech_detection.items() %}
+                                        {% if tech_data.exposed_files %}
+                                            {% for file in tech_data.exposed_files %}
+                                                {% set _ = exposed_files.append(file) %}
+                                            {% endfor %}
+                                        {% endif %}
+                                    {% endfor %}
+                                    {% if exposed_files %}
+                                    <div class="card">
+                                        <div class="card-header bg-white">
+                                            <h5><i class="bi bi-file-earmark-excel"></i> Exposed Files</h5>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="alert alert-warning">
+                                                <i class="bi bi-exclamation-triangle-fill"></i>
+                                                Found {{ exposed_files|length }} potentially sensitive files
+                                            </div>
+                                            <ul class="list-group">
+                                                {% for file in exposed_files %}
+                                                <li class="list-group-item">
+                                                    <a href="{{ file.url }}" target="_blank">{{ file.url }}</a>
+                                                    <span class="badge bg-secondary float-end">{{ file.content_type }}</span>
+                                                </li>
+                                                {% endfor %}
+                                            </ul>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                </div>
+
+                                <!-- Detailed Technology Findings -->
+                                <div class="col-md-8">
+                                    <div class="card mb-4">
+                                        <div class="card-header bg-white d-flex justify-content-between">
+                                            <h5><i class="bi bi-list-check"></i> Technology Details by URL</h5>
+                                            <input type="text" class="form-control w-50" id="techSearch" placeholder="Search technologies...">
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="accordion" id="techAccordion">
+                                                {% for url, tech_data in results.tech_detection.items() %}
+                                                <div class="accordion-item">
+                                                    <h2 class="accordion-header" id="techHeading{{ loop.index }}">
+                                                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" 
+                                                            data-bs-target="#techCollapse{{ loop.index }}" aria-expanded="false">
+                                                            <i class="bi bi-globe me-2"></i>
+                                                            {{ url }}
+                                                            <span class="badge bg-primary ms-2">{{ tech_data.technologies|length }} techs</span>
+                                                            {% if tech_data.secrets %}<span class="badge bg-danger ms-2">{{ tech_data.secrets|length }} secrets</span>{% endif %}
+                                                        </button>
+                                                    </h2>
+                                                    <div id="techCollapse{{ loop.index }}" class="accordion-collapse collapse" 
+                                                        aria-labelledby="techHeading{{ loop.index }}" data-bs-parent="#techAccordion">
+                                                        <div class="accordion-body">
+                                                            <!-- Cloud/CDN Info -->
+                                                            {% if tech_data.cloud or tech_data.cdn %}
+                                                            <div class="row mb-3">
+                                                                {% if tech_data.cloud %}
+                                                                <div class="col-md-6">
+                                                                    <div class="alert alert-info">
+                                                                        <h6><i class="bi bi-cloud"></i> Cloud Hosting</h6>
+                                                                        <strong>{{ tech_data.cloud.provider|upper }}</strong> ({{ tech_data.cloud.service }})
+                                                                        <br>
+                                                                        Confidence: {{ tech_data.cloud.confidence }}%
+                                                                    </div>
+                                                                </div>
+                                                                {% endif %}
+                                                                {% if tech_data.cdn %}
+                                                                <div class="col-md-6">
+                                                                    <div class="alert alert-secondary">
+                                                                        <h6><i class="bi bi-speedometer2"></i> CDN Detected</h6>
+                                                                        <strong>{{ tech_data.cdn.provider|title }}</strong>
+                                                                        <br>
+                                                                        Confidence: {{ tech_data.cdn.confidence }}%
+                                                                    </div>
+                                                                </div>
+                                                                {% endif %}
+                                                            </div>
+                                                            {% endif %}
+                                                            
+                                                            <!-- Technologies -->
+                                                            <h5>Technologies Detected:</h5>
+                                                            <div class="d-flex flex-wrap mb-3">
+                                                                {% for tech in tech_data.technologies %}
+                                                                <span class="badge tech-badge bg-{% if tech.category == 'web_servers' %}primary{% elif tech.category == 'frameworks' %}success{% else %}info{% endif %}">
+                                                                    {{ tech.name }}{% if tech.version %} (v{{ tech.version }}){% endif %}
+                                                                    {% if tech.confidence < 100 %}<small class="ms-1">{{ tech.confidence }}%</small>{% endif %}
+                                                                </span>
+                                                                {% endfor %}
+                                                            </div>
+                                                            
+                                                            <!-- Secrets -->
+                                                            {% if tech_data.secrets %}
+                                                            <h5 class="mt-4">Potential Secrets Found:</h5>
+                                                            <div class="alert alert-danger">
+                                                                <i class="bi bi-exclamation-triangle-fill"></i>
+                                                                {{ tech_data.secrets|length }} potential secrets found in JavaScript files
+                                                            </div>
+                                                            <div class="table-responsive">
+                                                                <table class="table table-sm">
+                                                                    <thead>
+                                                                        <tr>
+                                                                            <th>Type</th>
+                                                                            <th>Found In</th>
+                                                                            <th>Snippet</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody>
+                                                                        {% for secret in tech_data.secrets %}
+                                                                        <tr>
+                                                                            <td>{{ secret.type }}</td>
+                                                                            <td>{{ secret.file|truncate(30) }}</td>
+                                                                            <td>
+                                                                                <div class="secret-snippet">
+                                                                                    {{ secret.context|truncate(100) }}
+                                                                                </div>
+                                                                            </td>
+                                                                        </tr>
+                                                                        {% endfor %}
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+                                                            {% endif %}
+                                                            
+                                                            <!-- Endpoints -->
+                                                            {% if tech_data.endpoints %}
+                                                            <h5 class="mt-4">API Endpoints Found:</h5>
+                                                            <div class="table-responsive">
+                                                                <table class="table table-sm">
+                                                                    <thead>
+                                                                        <tr>
+                                                                            <th>URL</th>
+                                                                            <th>Method</th>
+                                                                            <th>Source</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody>
+                                                                        {% for endpoint in tech_data.endpoints %}
+                                                                        <tr>
+                                                                            <td><a href="{{ endpoint.url }}" target="_blank">{{ endpoint.url|truncate(40) }}</a></td>
+                                                                            <td>{{ endpoint.method }}</td>
+                                                                            <td>{{ endpoint.source|truncate(30) }}</td>
+                                                                        </tr>
+                                                                        {% endfor %}
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+                                                            {% endif %}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                {% endfor %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- High-Value Targets Tab -->
+                {% if results.security_analysis %}
+                <div class="tab-pane fade" id="targets" role="tabpanel">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover" id="targetsTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Target</th>
+                                            <th>Score</th>
+                                            <th>Risk</th>
+                                            <th>Reasons</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for target in results.security_analysis.high_value_targets %}
+                                        <tr>
+                                            <td>
+                                                <a href="{% if target.https_status %}https://{% else %}http://{% endif %}{{ target.subdomain }}" target="_blank">
+                                                    {{ target.subdomain }}
+                                                </a>
+                                            </td>
+                                            <td>{{ target.security_score }}</td>
+                                            <td>
+                                                <span class="badge bg-{% if target.risk_level == 'Critical' %}danger{% elif target.risk_level == 'High' %}warning{% else %}info{% endif %}">
+                                                    {{ target.risk_level }}
+                                                </span>
+                                            </td>
+                                            <td>{{ target.reasons|join(', ') }}</td>
+                                            <td>
+                                                {% if target.https_status %}
+                                                    <span class="badge bg-success">HTTPS: {{ target.https_status }}</span>
+                                                {% elif target.http_status %}
+                                                    <span class="badge bg-warning text-dark">HTTP: {{ target.http_status }}</span>
+                                                {% else %}
+                                                    <span class="badge bg-secondary">No response</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+<!-- Replace the commented Users & Emails section with this: -->
+<div class="tab-pane fade" id="users" role="tabpanel">
+    <div class="card">
+        <div class="card-body">
+            {% if results.email_enumeration %}
+                <!-- Email Patterns -->
+                {% if results.email_enumeration.email_formats %}
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h4><i class="bi bi-envelope"></i> Email Patterns</h4>
+                        <span class="badge bg-primary">{{ results.email_enumeration.email_formats|length }} patterns</span>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Pattern</th>
+                                    <th>Confidence</th>
+                                    <th>Source</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for pattern in results.email_enumeration.email_formats %}
+                                <tr>
+                                    <td><code>{{ pattern.pattern }}</code></td>
+                                    <td>
+                                        <div class="progress" style="height: 20px;">
+                                            <div class="progress-bar bg-{% if pattern.confidence > 80 %}success{% elif pattern.confidence > 50 %}warning{% else %}danger{% endif %}" 
+                                                 role="progressbar" style="width: {{ pattern.confidence }}%" 
+                                                 aria-valuenow="{{ pattern.confidence }}" aria-valuemin="0" aria-valuemax="100">
+                                                {{ pattern.confidence }}%
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>{{ pattern.source }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- Found Emails -->
+                {% if results.email_enumeration.found_emails %}
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h4><i class="bi bi-mailbox"></i> Discovered Emails</h4>
+                        <span class="badge bg-primary">{{ results.email_enumeration.found_emails|length }} emails</span>
+                    </div>
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> Found {{ results.email_enumeration.found_emails|length }} email addresses
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Email</th>
+                                    <th>Type</th>
+                                    <th>Confidence</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for email in results.email_enumeration.found_emails %}
+                                <tr>
+                                    <td><code>{{ email.email }}</code></td>
+                                    <td>
+                                        <span class="badge bg-{% if email.type == 'scraped' %}info{% else %}primary{% endif %}">
+                                            {{ email.type }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="progress" style="height: 20px;">
+                                            <div class="progress-bar bg-{% if email.confidence > 80 %}success{% elif email.confidence > 50 %}warning{% else %}danger{% endif %}" 
+                                                 role="progressbar" style="width: {{ email.confidence }}%" 
+                                                 aria-valuenow="{{ email.confidence }}" aria-valuemin="0" aria-valuemax="100">
+                                                {{ email.confidence }}%
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- Login Pages -->
+                {% if results.email_enumeration.login_pages %}
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h4><i class="bi bi-door-open"></i> Authentication Pages</h4>
+                        <span class="badge bg-{% if results.email_enumeration.login_pages|length > 0 %}danger{% else %}success{% endif %}">
+                            {{ results.email_enumeration.login_pages|length }} found
+                        </span>
+                    </div>
+                    <div class="alert alert-{% if results.email_enumeration.login_pages|length > 0 %}warning{% else %}success{% endif %}">
+                        <i class="bi bi-exclamation-triangle"></i> 
+                        Found {{ results.email_enumeration.login_pages|length }} authentication pages
+                    </div>
+                    <div class="table-responsive">
+                        <!-- Update the login pages table -->
+<table class="table table-sm table-hover">
+    <thead class="table-light">
+        <tr>
+            <th>URL</th>
+            <th>Type</th>
+            <th>Source</th>
+            <th>Status</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for login in results.email_enumeration.login_pages %}
+        <tr>
+            <td>
+                {% if login.url %}
+                    <a href="{{ login.url }}" target="_blank" class="text-truncate d-inline-block" style="max-width: 300px;">
+                        {{ login.url }}
+                    </a>
+                {% else %}
+                    <span class="text-muted">Not available</span>
+                {% endif %}
+            </td>
+            <td>
+                {% if login.type %}
+                    <span class="badge bg-{% if 'office365' in login.type %}primary{% elif 'gsuite' in login.type %}danger{% else %}warning{% endif %}">
+                        {{ login.type|replace('_', ' ')|title|default('Unknown', true) }}
+                    </span>
+                {% else %}
+                    <span class="badge bg-secondary">Unknown</span>
+                {% endif %}
+            </td>
+            <td>{{ login.source|default('scan', true) }}</td>
+            <td>
+                <span class="badge bg-{% if login.status == '200' %}success{% else %}warning{% endif %}">
+                    {{ login.status|default('200', true) }}
+                </span>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- Password Reset Pages -->
+                {% if results.email_enumeration.password_reset_pages %}
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h4><i class="bi bi-key"></i> Password Reset Pages</h4>
+                        <span class="badge bg-{% if results.email_enumeration.password_reset_pages|length > 0 %}danger{% else %}success{% endif %}">
+                            {{ results.email_enumeration.password_reset_pages|length }} found
+                        </span>
+                    </div>
+                    <div class="alert alert-{% if results.email_enumeration.password_reset_pages|length > 0 %}danger{% else %}success{% endif %}">
+                        <i class="bi bi-exclamation-triangle-fill"></i> 
+                        Found {{ results.email_enumeration.password_reset_pages|length }} password reset pages
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+    <thead class="table-light">
+        <tr>
+            <th>URL</th>
+            <th>Subdomain</th>
+            <th>Status</th>
+            <th>Source</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for reset in results.email_enumeration.password_reset_pages %}
+        <tr>
+            <td>
+                {% if reset.url %}
+                    <a href="{{ reset.url }}" target="_blank" class="text-truncate d-inline-block" style="max-width: 300px;">
+                        {{ reset.url }}
+                    </a>
+                {% else %}
+                    <span class="text-muted">Not available</span>
+                {% endif %}
+            </td>
+            <td>{{ reset.subdomain|default(results.domain, true) }}</td>
+            <td>
+                <span class="badge bg-{% if reset.status == '200' %}success{% else %}warning{% endif %}">
+                    {{ reset.status|default('200', true) }}
+                </span>
+            </td>
+            <td>{{ reset.source|default('scan', true) }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+                    </div>
+                </div>
+                {% endif %}
+            {% else %}
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> No email or authentication page data available
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Initialize DataTables
+    $('#subdomainsTable').DataTable({
+        pageLength: 10,
+        responsive: true
+    });
+    
+    if ($('#targetsTable').length) {
+        $('#targetsTable').DataTable({
+            pageLength: 10,
+            responsive: true,
+            order: [[1, 'desc']]
+        });
+    }
+
+    // Port search functionality
+    $('#portSearch').on('keyup', function() {
+        const value = $(this).val().toLowerCase();
+        $('.accordion-item').each(function() {
+            const text = $(this).text().toLowerCase();
+            $(this).toggle(text.indexOf(value) > -1);
+        });
+    });
+
+    // Technology search
+    $('#techSearch').on('keyup', function() {
+        const value = $(this).val().toLowerCase();
+        $('.accordion-item').each(function() {
+            const text = $(this).text().toLowerCase();
+            $(this).toggle(text.indexOf(value) > -1);
+        });
+    });
+
+    // Persist tab selection in URL
+    $('button[data-bs-toggle="tab"]').on('click', function() {
+        const tabId = $(this).attr('data-bs-target');
+        window.location.hash = tabId;
+    });
+
+    // Check for hash on page load
+    if (window.location.hash) {
+        const tab = $('[data-bs-target="' + window.location.hash + '"]');
+        if (tab.length) {
+            tab.tab('show');
+        }
+    }
+
+    // Show toast when copying proof
+    $(document).on('click', '.copy-btn', function() {
+        const toast = $(`
+            <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+                <div class="toast show" role="alert" aria-live="assertive" aria-atomic="true">
+                    <div class="toast-header bg-success text-white">
+                        <strong class="me-auto">Copied!</strong>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+                    </div>
+                    <div class="toast-body">
+                        Proof copied to clipboard
+                    </div>
+                </div>
+            </div>
+        `);
+        $('body').append(toast);
+        setTimeout(() => toast.remove(), 2000);
+    });
+});
+</script>
+{% endblock %}
