@@ -55,7 +55,7 @@ pip install -r requirements.txt
 ```
 Configuration
 
-U need to add your GROQ api key in the AI_analyst.py script , here
+U need to add your GROQ api key in the AI_analyst.py script (U can do this here : https://console.groq.com/keys ) , here :
 
 ```bash
 
@@ -75,7 +75,7 @@ class AIAnalyst:
         Args:
             groq_api_key: Optional Groq API key (if not provided, will use rule-based analysis only)
         """
-        self.groq_api_key = "GROQ_API_KEY"
+        self.groq_api_key = "Add here your GROQ_API_KEY"
         self.logger = logging.getLogger(__name__)
         
         # Set up logging
@@ -103,12 +103,12 @@ API Endpoints
 ```
 
 Scan Types
-  Scan Type	Description	Intensity Levels
-  Full Audit	Complete security assessment	Light/Normal/Aggressive
-  Web Focus	Application-layer only	Normal
-  Infrastructure	Network and server assessment	Aggressive
-  Quick Scan	Surface-level vulnerabilities	Light
-  Sample Report Output
+Scan Type	Description	Intensity Levels
+Full Audit	Complete security assessment	Light/Normal/Aggressive
+Web Focus	Application-layer only	Normal
+Infrastructure	Network and server assessment	Aggressive
+Quick Scan	Surface-level vulnerabilities	Light
+Sample Report Output
 
 Security Notice
 
