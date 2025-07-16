@@ -4,7 +4,7 @@
 ![Python](https://img.shields.io/badge/Python-3.8%2B-green)
 ![Flask](https://img.shields.io/badge/Flask-2.3.2-lightgrey)
 
-ARTEX is an advanced web application security analysis platform that automates reconnaissance, vulnerability scanning, and threat assessment for modern web applications and infrastructure.
+ARTEX is an advanced web application security analysis platform that automates reconnaissance, vulnerability scanning, vulnerability scanning, threat assessment and AI-powered security recommendations  for modern web applications and infrastructure.
 
 ## Key Features
 
