@@ -6,7 +6,7 @@
 
 ARTEX is an advanced web application security analysis platform that automates reconnaissance, vulnerability scanning, vulnerability scanning, threat assessment and AI-powered security recommendations  for modern web applications and infrastructure.
 
-<img width="1024" height="1024" alt="ChatGPT Image Jul 17, 2025, 10_28_41 AM" src="https://github.com/user-attachments/assets/6c82a596-4d62-493d-b364-642ee7b9b0fb" />
+<img width="545" height="402" alt="ChatGPT Image Jul 17, 2025, 10_28_41 AM" src="https://github.com/user-attachments/assets/3357002f-5aa7-41c6-bc7d-090c463a836f" />
 
 
 ## Key Features
