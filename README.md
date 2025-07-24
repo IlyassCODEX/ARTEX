@@ -1,4 +1,4 @@
-# ARTEX - Automated Reconnaissance & Threat Exposure Analyzer
+# ARTEX V 2.0 - Automated Reconnaissance & Threat Exposure Analyzer
 
 ![Security](https://img.shields.io/badge/Security-Pentesting-blue)
 ![Python](https://img.shields.io/badge/Python-3.8%2B-green)
@@ -14,6 +14,8 @@ ARTEX is an advanced web application security analysis platform that automates r
 - **Comprehensive Scanning**:
   - Subdomain enumeration
   - Port scanning with risk assessment
+  - Comprehensive DNS scanning
+  - Advanced SSL/TLS scanning & vulns discovering by versions
   - Technology stack fingerprinting
   - Authentication surface detection
 
