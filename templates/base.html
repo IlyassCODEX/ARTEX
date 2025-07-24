@@ -5,258 +5,189 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ARTEX - {% block title %}{% endblock %}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <style>
         :root {
-            --primary-color: #2563eb;
-            --secondary-color: #1e40af;
-            --dark-color: #1f2937;
-            --light-color: #f9fafb;
-            --retro-border: 4px solid #000;
-            --retro-highlight: 4px solid #fff;
-            --retro-shadow: 4px solid #666;
+            --primary-color: #4361ee;
+            --primary-light: #eef2ff;
+            --secondary-color: #3f37c9;
+            --dark-color: #1e1b4b;
+            --light-color: #f8fafc;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --info-color: #3b82f6;
+            --border-radius: 8px;
+            --box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --transition: all 0.2s ease-in-out;
         }
         
         body {
-            font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
-            background-color: white;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: #f8fafc;
             color: var(--dark-color);
-            line-height: 1.5;
+            line-height: 1.6;
         }
         
         .navbar {
             padding: 1rem 0;
-            border-bottom: 1px solid rgba(0,0,0,0.05);
+            background-color: white;
+            box-shadow: var(--box-shadow);
         }
         
         .navbar-brand {
             font-weight: 700;
             font-size: 1.4rem;
             color: var(--primary-color);
-            letter-spacing: -0.5px;
+            display: flex;
+            align-items: center;
         }
         
-        /* New Modern Retro Button Styles */
-        
-        /* New Modern Retro Button Styles */
-        .btn-retro {
-            background: #686ae7;
-            font-family: inherit;
-            padding: 0.6em 1.3em;
-            font-weight: 900;
-            font-size: 18px;
-            border: 3px solid black;
-            border-radius: 0.4em;
-            box-shadow: 0.1em 0.1em;
-            cursor: pointer;
-            color: #000;
-            text-decoration: none;
-            display: inline-block;
-            transition: all 0.1s ease;
-            margin: 8px;
-            text-align: center;
-            min-width: 200px;
-        }
-        
-        .btn-retro:hover {
-            background: #4f43b9;
-            color: #000;
-            transform: translate(0.05em, 0.05em);
-            box-shadow: 0.05em 0.05em;
-            text-decoration: none;
-        }
-        
-        .btn-retro:active {
-            transform: translate(0.1em, 0.1em);
-            box-shadow: 0.02em 0.02em;
-        }
-        
-        .btn-retro:focus {
-            outline: none;
-            box-shadow: 0.1em 0.1em, 0 0 0 3px rgba(251, 202, 31, 0.3);
-        }
-        
-        .btn-retro-primary {
-        }
-        
-        .btn-retro-primary:hover {
-        }
-        
-        .btn-retro-primary:active {
-            transform: translate(0.1em, 0.1em);
-            box-shadow: 0.02em 0.02em;
-        }
-        
-        .btn-retro:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none !important;
-            box-shadow: 0.1em 0.1em !important;
-        }
-        
-        .btn-retro:disabled:hover {
-            transform: none !important;
-            box-shadow: 0.1em 0.1em !important;
-            background: #fbca1f;
-        }
-        
-        .btn-retro-primary:disabled:hover {
-            background: #4a6baf;
-        }
-        
-        /* Retro Checkbox Styles */
-        .form-check-input-retro {
-            -webkit-appearance: none;
-            -moz-appearance: none;
-            appearance: none;
-            width: 18px;
-            height: 18px;
-            border: 2px solid #000;
-            background-color: #fff;
-            position: relative;
+        .navbar-brand i {
             margin-right: 8px;
-            vertical-align: middle;
+            font-size: 1.6rem;
         }
         
-        .form-check-input-retro:checked {
-            background-color: #4a6baf;
-        }
-        
-        .form-check-input-retro:checked::after {
-            content: "✓";
-            position: absolute;
+        /* Modern Button Styles */
+        .btn-modern {
+            background-color: var(--primary-color);
             color: white;
-            font-size: 14px;
-            left: 2px;
-            top: -1px;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            font-weight: 500;
+            border-radius: var(--border-radius);
+            transition: var(--transition);
+            box-shadow: var(--box-shadow);
         }
         
-        /* Retro Card Styles */
-        .card-retro {
-            border-radius: 0;
-            border: 4px solid #000;
-            background-color: #f0f0f0;
-            box-shadow: 8px 8px 0 rgba(0,0,0,0.2);
+        .btn-modern:hover {
+            background-color: var(--secondary-color);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
         }
         
-        .card {
-            border-radius: 8px;
-            border: 1px solid rgba(0,0,0,0.05);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+        .btn-modern:active {
+            transform: translateY(0);
         }
         
-        .hero {
-            background: linear-gradient(135deg, #f8fafc 0%, #f0f9ff 100%);
-            padding: 3rem 0;
+        /* Card Styles */
+        .card-modern {
+            border: none;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            transition: var(--transition);
+            background-color: white;
         }
         
-        .feature-icon {
-            font-size: 1.75rem;
+        .card-modern:hover {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Badge Styles */
+        .badge-modern {
+            font-weight: 500;
+            padding: 0.35rem 0.75rem;
+            border-radius: 20px;
+        }
+        
+        /* Form Styles */
+        .form-control-modern {
+            border: 1px solid #e2e8f0;
+            border-radius: var(--border-radius);
+            padding: 0.75rem 1rem;
+            transition: var(--transition);
+        }
+        
+        .form-control-modern:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.15);
+        }
+        
+        /* Table Styles */
+        .table-modern {
+            border-radius: var(--border-radius);
+            overflow: hidden;
+        }
+        
+        .table-modern thead th {
+            background-color: var(--primary-light);
+            color: var(--dark-color);
+            font-weight: 600;
+            border-bottom: none;
+        }
+        
+        /* Alert Styles */
+        .alert-modern {
+            border-radius: var(--border-radius);
+            border: none;
+        }
+        
+        /* Progress Bar */
+        .progress-modern {
+            height: 8px;
+            border-radius: 4px;
+            background-color: #e2e8f0;
+        }
+        
+        .progress-bar-modern {
+            background-color: var(--primary-color);
+            border-radius: 4px;
+        }
+        
+        /* Logo Animation */
+        .logo-container {
+            display: flex;
+            align-items: center;
+        }
+        
+        .logo-text {
+            font-weight: 700;
             color: var(--primary-color);
-            margin-bottom: 1rem;
+            position: relative;
         }
-/* Updated Logo Animation Styles */
-.logo-container {
-    position: relative;
-    display: inline-block;
-    height: 1.5rem; /* Fixed height for consistent alignment */
-    line-height: 1.5rem; /* Center letters vertically */
-}
-
-.logo-text {
-    display: inline-block;
-    position: relative;
-    font-size: 1.4rem;
-    font-weight: 700;
-}
-
-.logo-letter {
-    display: inline-block;
-    transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-    position: relative;
-    vertical-align: middle;
-}
-
-.logo-letter.sword {
-    font-size: 1.6rem; /* Slightly larger than other letters by default */
-    transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-    margin: 0 -2px; /* Adjust spacing to keep letters tight */
-}
-
-.logo-container:hover .logo-letter.sword {
-    font-size: 2rem; /* Larger than other letters on hover */
-    color: var(--primary-color);
-    transform: translateY(-2px);
-}
-
-.logo-container:hover .logo-letter.sword::before {
-    content: "";
-    background-image: url('https://cdn-icons-png.flaticon.com/128/11775/11775581.png');
-    background-size: contain;
-    background-repeat: no-repeat;
-    background-position: center;
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    width: 24px; /* Slightly larger icon */
-    height: 24px;
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
-    filter: hue-rotate(220deg) saturate(1.2) brightness(0.8);
-}
-
-.logo-letter.sword::before {
-    content: "";
-    background-image: url('https://cdn-icons-png.flaticon.com/128/11775/11775581.png');
-    background-size: contain;
-    background-repeat: no-repeat;
-    background-position: center;
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    width: 20px;
-    height: 20px;
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(0);
-    transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-    filter: hue-rotate(220deg) saturate(1.2) brightness(0.8);
-}
-
-.logo-container:hover .logo-letter.sword .original-letter {
-    opacity: 0;
-    transform: scale(0);
-}
-
-.original-letter {
-    opacity: 1;
-    transform: scale(1);
-    transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-}
-
-/* Make AR and EX maintain their size when T becomes sword */
-.logo-container:hover .logo-letter:not(.sword) {
-    transform: translateY(0); /* Remove the downward movement */
-}
+        
+        .logo-text::after {
+            content: "";
+            position: absolute;
+            bottom: -4px;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background-color: var(--primary-color);
+            transform: scaleX(0);
+            transform-origin: right;
+            transition: transform 0.3s ease;
+        }
+        
+        .logo-container:hover .logo-text::after {
+            transform: scaleX(1);
+            transform-origin: left;
+        }
+        
+        /* Main content container */
+        .main-container {
+            padding: 2rem 0;
+        }
+        
+        /* Footer */
+        footer {
+            background-color: white;
+            padding: 1.5rem 0;
+            margin-top: 3rem;
+            box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.05);
+        }
     </style>
     {% block extra_css %}{% endblock %}
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-light bg-white">
+    <nav class="navbar navbar-expand-lg navbar-light">
         <div class="container">
             <a class="navbar-brand" href="/">
-    <div class="logo-container">
-        <div class="logo-text">
-            <span class="logo-letter">A</span>
-            <span class="logo-letter">R</span>
-            <span class="logo-letter sword">
-                <span class="original-letter">T</span>
-            </span>
-            <span class="logo-letter">E</span>
-            <span class="logo-letter">X</span>
-        </div>
-    </div>
-</a>
+                <i class="bi bi-shield-lock"></i>
+                <span class="logo-text">ARTEX</span>
+            </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
@@ -270,26 +201,26 @@
         </div>
     </nav>
 
-    {% block hero %}{% endblock %}
+    <div class="main-container">
+        <div class="container">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }} alert-modern alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
 
-    <div class="container mt-4">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                        {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-
-        {% block content %}{% endblock %}
+            {% block content %}{% endblock %}
+        </div>
     </div>
 
-    <footer class="mt-5 py-3">
+    <footer class="py-3">
         <div class="container text-center">
-            <p class="text-muted small">ARTEX &copy; 2025 - Security Reconnaissance Tool</p>
+            <p class="text-muted small mb-0">ARTEX &copy; 2025 - Security Reconnaissance Tool</p>
         </div>
     </footer>
 
