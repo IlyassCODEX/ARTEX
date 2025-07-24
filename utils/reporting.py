@@ -102,7 +102,7 @@ class ReportGenerator:
             backColor=self.bg_color
         )
 
-        # Body styles
+        # Body styles with word wrap
         self.body_style = ParagraphStyle(
             'Body',
             parent=self.styles['Normal'],
@@ -112,7 +112,9 @@ class ReportGenerator:
             alignment=TA_LEFT,
             textColor=self.text_color,
             fontName='Courier',
-            backColor=self.bg_color
+            backColor=self.bg_color,
+            wordWrap='LTR',
+            splitLongWords=True
         )
 
         self.bullet_style = ParagraphStyle(
@@ -122,10 +124,12 @@ class ReportGenerator:
             spaceBefore=3,
             bulletIndent=5,
             bulletFontName='Courier',
-            bulletFontSize=10
+            bulletFontSize=10,
+            wordWrap='LTR',
+            splitLongWords=True
         )
 
-        # Table styles
+        # Table styles with word wrap
         self.table_header_style = ParagraphStyle(
             'TableHeader',
             parent=self.styles['Normal'],
@@ -133,7 +137,9 @@ class ReportGenerator:
             textColor=colors.white,
             alignment=TA_CENTER,
             fontName='Courier-Bold',
-            backColor=self.primary_color
+            backColor=self.primary_color,
+            wordWrap='LTR',
+            splitLongWords=True
         )
 
         self.table_cell_style = ParagraphStyle(
@@ -144,7 +150,9 @@ class ReportGenerator:
             textColor=self.text_color,
             alignment=TA_LEFT,
             fontName='Courier',
-            backColor=self.bg_color
+            backColor=self.bg_color,
+            wordWrap='LTR',
+            splitLongWords=True
         )
 
         # Badge style
@@ -226,28 +234,34 @@ class ReportGenerator:
                                     backColor=self.bg_color,
                                     borderWidth=1,
                                     borderColor=self.border_color,
-                                    borderPadding=(5, 5, 5, 5)
+                                    borderPadding=(5, 5, 5, 5),
+                                    wordWrap='LTR',
+                                    splitLongWords=True
                                 )))
         elements.append(Spacer(1, 0.3*inch))
         
         # Metadata table with retro styling
         scan_time = format_timestamp(scan_results.get('timestamp', '')) or "Unknown"
         info_data = [
-            ["<b>Scan ID:</b>", scan_results.get('scan_id', 'N/A')],
-            ["<b>Date:</b>", scan_time],
-            ["<b>Subdomains:</b>", str(len(scan_results.get('subdomains', [])))],
-            ["<b>Active:</b>", str(len([s for s in scan_results.get('subdomains', []) 
-                                      if s.get('http_status') or s.get('https_status')]))],
-            ["<b>Open Ports:</b>", str(sum(len(scan.get('ports', []))) 
-                                    for scan in scan_results.get('port_scan', []))],
-            ["<b>Technologies:</b>", str(sum(len(techs) for techs in scan_results.get('tech_detection', {}).values()))]
+            [Paragraph("Scan ID:", self.table_header_style), 
+             Paragraph(scan_results.get('scan_id', 'N/A'), self.table_cell_style)],
+            [Paragraph("Date:", self.table_header_style), 
+             Paragraph(scan_time, self.table_cell_style)],
+            [Paragraph("Subdomains:", self.table_header_style), 
+             Paragraph(str(len(scan_results.get('subdomains', []))), self.table_cell_style)],
+            [Paragraph("Active:", self.table_header_style), 
+             Paragraph(str(len([s for s in scan_results.get('subdomains', []) 
+                             if s.get('http_status') or s.get('https_status')])), self.table_cell_style)],
+            [Paragraph("Open Ports:", self.table_header_style), 
+             Paragraph(str(sum(len(scan.get('ports', [])) 
+                          for scan in scan_results.get('port_scan', []))), self.table_cell_style)],
+            [Paragraph("Technologies:", self.table_header_style), 
+             Paragraph(str(sum(len(techs) for techs in scan_results.get('tech_detection', {}).values())), self.table_cell_style)]
         ]
         
         info_table = Table(info_data, colWidths=[2*inch, 3*inch])
         info_table.setStyle(TableStyle([
             ('ALIGN', (0,0), (-1,-1), 'LEFT'),
-            ('FONTNAME', (0,0), (0,-1), 'Courier-Bold'),
-            ('FONTNAME', (1,0), (1,-1), 'Courier'),
             ('FONTSIZE', (0,0), (-1,-1), 10),
             ('LEADING', (0,0), (-1,-1), 14),
             ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
@@ -268,7 +282,9 @@ class ReportGenerator:
             fontSize=14,
             textColor=self.accent_color,
             spaceBefore=20,
-            alignment=TA_CENTER
+            alignment=TA_CENTER,
+            wordWrap='LTR',
+            splitLongWords=True
         )))
         
         elements.append(Paragraph("This report contains sensitive security information and is intended only for authorized recipients.", 
@@ -279,7 +295,9 @@ class ReportGenerator:
                                     borderWidth=1,
                                     borderColor=self.border_color,
                                     borderPadding=(5, 5, 5, 5),
-                                    backColor=self.bg_color
+                                    backColor=self.bg_color,
+                                    wordWrap='LTR',
+                                    splitLongWords=True
                                 )))
         
         elements.append(PageBreak())
@@ -306,11 +324,13 @@ class ReportGenerator:
         
         toc_data = []
         for item, page in toc_items:
-            toc_data.append([item, str(page)])
+            toc_data.append([
+                Paragraph(item, self.table_cell_style),
+                Paragraph(str(page), self.table_cell_style)
+            ])
         
         toc_table = Table(toc_data, colWidths=[4*inch, 1*inch])
         toc_table.setStyle(TableStyle([
-            ('FONTNAME', (0,0), (-1,-1), 'Courier'),
             ('FONTSIZE', (0,0), (-1,-1), 10),
             ('LEADING', (0,0), (-1,-1), 14),
             ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
@@ -342,14 +362,20 @@ class ReportGenerator:
     
         # Key findings table with retro styling
         findings_data = [
-            ["<b>Category</b>", "<b>Findings</b>"],
-            ["Subdomains Discovered", len(scan_results.get('subdomains', []))],
-            ["Active Web Services", len([s for s in scan_results.get('subdomains', []) 
-                                      if s.get('http_status') or s.get('https_status')])],
-            ["Open Ports Identified", sum(len(scan.get('ports', [])) 
-                                  for scan in scan_results.get('port_scan', []))],
-            ["Unique Technologies", sum(len(techs) for techs in scan_results.get('tech_detection', {}).values())],
-            ["Email Patterns Found", len(scan_results.get('email_enumeration', {}).get('email_formats', []))]
+            [Paragraph("Category", self.table_header_style),
+             Paragraph("Findings", self.table_header_style)],
+            [Paragraph("Subdomains Discovered", self.table_cell_style),
+             Paragraph(str(len(scan_results.get('subdomains', []))), self.table_cell_style)],
+            [Paragraph("Active Web Services", self.table_cell_style),
+             Paragraph(str(len([s for s in scan_results.get('subdomains', []) 
+                                      if s.get('http_status') or s.get('https_status')])), self.table_cell_style)],
+            [Paragraph("Open Ports Identified", self.table_cell_style),
+             Paragraph(str(sum(len(scan.get('ports', [])) 
+                                  for scan in scan_results.get('port_scan', []))), self.table_cell_style)],
+            [Paragraph("Unique Technologies", self.table_cell_style),
+             Paragraph(str(sum(len(techs) for techs in scan_results.get('tech_detection', {}).values())), self.table_cell_style)],
+            [Paragraph("Email Patterns Found", self.table_cell_style),
+             Paragraph(str(len(scan_results.get('email_enumeration', {}).get('email_formats', []))), self.table_cell_style)]
         ]
     
         findings_table = Table(findings_data, colWidths=[2.5*inch, 2.5*inch])
@@ -357,8 +383,6 @@ class ReportGenerator:
             ('BACKGROUND', (0,0), (-1,0), self.primary_color),
             ('TEXTCOLOR', (0,0), (-1,0), colors.white),
             ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-            ('FONTNAME', (0,0), (-1,0), 'Courier-Bold'),
-            ('FONTNAME', (0,1), (-1,-1), 'Courier'),
             ('FONTSIZE', (0,0), (-1,-1), 10),
             ('GRID', (0,0), (-1,-1), 1, self.border_color),
             ('BOX', (0,0), (-1,-1), 2, self.border_color),
@@ -377,18 +401,20 @@ class ReportGenerator:
             risk_color = self.risk_colors.get(risk_level, colors.black)
             
             risk_data = [
-                ["<b>Risk Level:</b>", risk.get('level', 'Unknown')],
-                ["<b>Risk Score:</b>", f"{risk.get('score', 0)}/100"],
-                ["<b>Critical Findings:</b>", risk.get('critical_assets', 0)],
-                ["<b>High Risk Findings:</b>", risk.get('total_risk_assets', 0) - risk.get('critical_assets', 0)]
+                [Paragraph("Risk Level:", self.table_header_style),
+                 Paragraph(risk.get('level', 'Unknown'), self.table_cell_style)],
+                [Paragraph("Risk Score:", self.table_header_style),
+                 Paragraph(f"{risk.get('score', 0)}/100", self.table_cell_style)],
+                [Paragraph("Critical Findings:", self.table_header_style),
+                 Paragraph(str(risk.get('critical_assets', 0)), self.table_cell_style)],
+                [Paragraph("High Risk Findings:", self.table_header_style),
+                 Paragraph(str(risk.get('total_risk_assets', 0) - risk.get('critical_assets', 0)), self.table_cell_style)]
             ]
             
             risk_table = Table(risk_data, colWidths=[2*inch, 3*inch])
             risk_table.setStyle(TableStyle([
                 ('BACKGROUND', (0,0), (-1,0), self.accent_color),
                 ('TEXTCOLOR', (0,0), (-1,0), colors.white),
-                ('FONTNAME', (0,0), (0,-1), 'Courier-Bold'),
-                ('FONTNAME', (1,0), (1,-1), 'Courier'),
                 ('FONTSIZE', (0,0), (-1,-1), 10),
                 ('GRID', (0,0), (-1,-1), 1, self.border_color),
                 ('BOX', (0,0), (-1,-1), 2, self.border_color),
@@ -423,14 +449,20 @@ class ReportGenerator:
         
         # Statistics table with retro styling
         stats_data = [
-            ["<b>Metric</b>", "<b>Count</b>"],
-            ["Total Subdomains", len(subdomains)],
-            ["Active Subdomains", len(active_subdomains)],
-            ["HTTPS Enabled", len([s for s in active_subdomains if s.get('https_status')])],
-            ["HTTP Only", len([s for s in active_subdomains 
-                             if s.get('http_status') and not s.get('https_status')])],
-            ["No Web Services", len([s for s in subdomains 
-                                   if not s.get('http_status') and not s.get('https_status')])]
+            [Paragraph("Metric", self.table_header_style),
+             Paragraph("Count", self.table_header_style)],
+            [Paragraph("Total Subdomains", self.table_cell_style),
+             Paragraph(str(len(subdomains)), self.table_cell_style)],
+            [Paragraph("Active Subdomains", self.table_cell_style),
+             Paragraph(str(len(active_subdomains)), self.table_cell_style)],
+            [Paragraph("HTTPS Enabled", self.table_cell_style),
+             Paragraph(str(len([s for s in active_subdomains if s.get('https_status')])), self.table_cell_style)],
+            [Paragraph("HTTP Only", self.table_cell_style),
+             Paragraph(str(len([s for s in active_subdomains 
+                             if s.get('http_status') and not s.get('https_status')])), self.table_cell_style)],
+            [Paragraph("No Web Services", self.table_cell_style),
+             Paragraph(str(len([s for s in subdomains 
+                                   if not s.get('http_status') and not s.get('https_status')])), self.table_cell_style)]
         ]
         
         stats_table = Table(stats_data, colWidths=[2.5*inch, 2.5*inch])
@@ -438,8 +470,6 @@ class ReportGenerator:
             ('BACKGROUND', (0,0), (-1,0), self.primary_color),
             ('TEXTCOLOR', (0,0), (-1,0), colors.white),
             ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-            ('FONTNAME', (0,0), (-1,0), 'Courier-Bold'),
-            ('FONTNAME', (0,1), (-1,-1), 'Courier'),
             ('FONTSIZE', (0,0), (-1,-1), 10),
             ('GRID', (0,0), (-1,-1), 1, self.border_color),
             ('BOX', (0,0), (-1,-1), 2, self.border_color),
@@ -452,14 +482,22 @@ class ReportGenerator:
         # Active subdomains table with retro styling
         elements.append(Paragraph("Active Subdomains", self.heading2_style))
         
-        active_data = [["<b>Subdomain</b>", "<b>IP</b>", "<b>HTTP</b>", "<b>HTTPS</b>", "<b>Title</b>"]]
+        active_data = [
+            [Paragraph("Subdomain", self.table_header_style),
+             Paragraph("IP", self.table_header_style),
+             Paragraph("HTTP", self.table_header_style),
+             Paragraph("HTTPS", self.table_header_style),
+             Paragraph("Title", self.table_header_style)]
+        ]
+        
         for sub in active_subdomains[:20]:  # Limit to 20 for readability
             active_data.append([
-                sub['subdomain'],
-                sub.get('ip', 'N/A'),
-                sub.get('http_status', '-'),
-                sub.get('https_status', '-'),
-                sub.get('title', '')[:30] + ('...' if len(sub.get('title', '')) > 30 else '')
+                Paragraph(sub['subdomain'], self.table_cell_style),
+                Paragraph(sub.get('ip', 'N/A'), self.table_cell_style),
+                Paragraph(str(sub.get('http_status', '-')), self.table_cell_style),  # Ensure string conversion
+                Paragraph(str(sub.get('https_status', '-')), self.table_cell_style),  # Ensure string conversion
+                Paragraph(sub.get('title', '')[:50] + ('...' if len(sub.get('title', '')) > 50 else ''), 
+                self.table_cell_style)
             ])
         
         active_table = Table(active_data, colWidths=[1.8*inch, 1.2*inch, 0.6*inch, 0.6*inch, 1.8*inch])
@@ -467,8 +505,6 @@ class ReportGenerator:
             ('BACKGROUND', (0,0), (-1,0), self.secondary_color),
             ('TEXTCOLOR', (0,0), (-1,0), colors.white),
             ('ALIGN', (0,0), (-1,-1), 'LEFT'),
-            ('FONTNAME', (0,0), (-1,0), 'Courier-Bold'),
-            ('FONTNAME', (0,1), (-1,-1), 'Courier'),
             ('FONTSIZE', (0,0), (-1,-1), 9),
             ('GRID', (0,0), (-1,-1), 1, self.border_color),
             ('BOX', (0,0), (-1,-1), 2, self.border_color),
@@ -501,7 +537,7 @@ class ReportGenerator:
                 service = port.get('service', 'unknown')
                 port_dist[service] = port_dist.get(service, 0) + 1
         
-        dist_data = [["<b>Service</b>", "<b>Count</b>"]]
+        dist_data = [["Service", "Count"]]
         for service, count in sorted(port_dist.items(), key=lambda x: x[1], reverse=True)[:10]:  # Top 10
             dist_data.append([service, str(count)])
         
@@ -530,7 +566,7 @@ class ReportGenerator:
                 
             elements.append(Paragraph(f"Target: {scan['target']}", self.heading2_style))
             
-            port_data = [["<b>Port</b>", "<b>Service</b>", "<b>Version</b>", "<b>Risk</b>", "<b>Banner</b>"]]
+            port_data = [["Port", "Service", "Version", "Risk", "Banner"]]
             for port in scan['ports'][:20]:  # Limit to 20 ports per host
                 banner = port.get('banner', '')
                 risk_level = port.get('risk', {}).get('level', 'unknown').lower()
@@ -596,7 +632,7 @@ class ReportGenerator:
                 tech_summary[category][name] = tech_summary[category].get(name, 0) + 1
     
         if tech_summary:
-            summary_data = [["<b>Category</b>", "<b>Technologies</b>"]]
+            summary_data = [["Category", "Technologies"]]
             for category, techs in tech_summary.items():
                 tech_list = ", ".join([f"{name} ({count})" for name, count in techs.items()])
                 summary_data.append([category.title(), tech_list])
@@ -632,7 +668,7 @@ class ReportGenerator:
                 elements.append(Spacer(1, 0.2*inch))
                 continue
             
-            tech_data = [["<b>Technology</b>", "<b>Version</b>", "<b>Category</b>", "<b>Confidence</b>"]]
+            tech_data = [["Technology", "Version", "Category", "Confidence"]]
             for tech in techs:
                 if isinstance(tech, dict):
                     tech_data.append([
@@ -683,7 +719,7 @@ class ReportGenerator:
         if email_data.get('email_formats'):
             elements.append(Paragraph("Discovered Email Patterns", self.heading2_style))
             
-            pattern_data = [["<b>Pattern</b>", "<b>Example</b>", "<b>Confidence</b>"]]
+            pattern_data = [["Pattern", "Example", "Confidence"]]
             for pattern in email_data['email_formats']:
                 pattern_data.append([
                     pattern.get('pattern', 'N/A'),
@@ -711,7 +747,7 @@ class ReportGenerator:
         if email_data.get('found_emails'):
             elements.append(Paragraph("Discovered Emails", self.heading2_style))
             
-            email_data = [["<b>Email</b>", "<b>Type</b>", "<b>Confidence</b>"]]
+            email_data = [["Email", "Type", "Confidence"]]
             for email in email_data['found_emails'][:20]:  # Limit to 20
                 email_data.append([
                     email.get('email', 'N/A'),
@@ -739,12 +775,12 @@ class ReportGenerator:
         if email_data.get('login_pages'):
             elements.append(Paragraph("Discovered Login Pages", self.heading2_style))
             
-            login_data = [["<b>URL</b>", "<b>Type</b>", "<b>Status</b>"]]
+            login_data = [["URL", "Type", "Status"]]
             for login in email_data['login_pages'][:10]:  # Limit to 10
                 login_data.append([
-                    login.get('url', 'N/A'),
-                    login.get('type', 'N/A').title().replace('_', ' '),
-                    login.get('status', '200')
+                    Paragraph(login.get('url', 'N/A'), self.table_cell_style),  # Ensure string conversion
+                    Paragraph(login.get('type', 'N/A').title().replace('_', ' '), self.table_cell_style),  # Ensure string conversion
+                    Paragraph(login.get('status', '200'), self.table_cell_style)  # Ensure string conversion
                 ])
             
             login_table = Table(login_data, colWidths=[3*inch, 1*inch, 1*inch])
@@ -784,10 +820,10 @@ class ReportGenerator:
         risk_color = self.risk_colors.get(risk_level, colors.black)
 
         risk_data = [
-            ["<b>Risk Level:</b>", risk.get('level', 'Unknown')],
-            ["<b>Risk Score:</b>", f"{risk.get('score', 0)}/100"],
-            ["<b>Critical Findings:</b>", risk.get('critical_assets', 0)],
-            ["<b>High Risk Findings:</b>", risk.get('total_risk_assets', 0) - risk.get('critical_assets', 0)]
+            ["Risk Level:", risk.get('level', 'Unknown')],
+            ["Risk Score:", f"{risk.get('score', 0)}/100"],
+            ["Critical Findings:", risk.get('critical_assets', 0)],
+            ["High Risk Findings:", risk.get('total_risk_assets', 0) - risk.get('critical_assets', 0)]
             ]
     
         risk_table = Table(risk_data, colWidths=[2*inch, 3*inch])
@@ -821,7 +857,7 @@ class ReportGenerator:
         if attack_surface and attack_surface.get('vectors'):
             elements.append(Paragraph("Attack Surface Analysis", self.heading2_style))
         
-            attack_data = [["<b>Vector Type</b>", "<b>Count</b>", "<b>Risk Level</b>"]]
+            attack_data = [["Vector Type", "Count", "Risk Level"]]
             for vector in attack_surface['vectors'][:10]:  # Limit to 10
                 risk_level = vector.get('risk', 'unknown').lower()
                 attack_data.append([
@@ -857,7 +893,7 @@ class ReportGenerator:
         if security_analysis.get('high_value_targets'):
             elements.append(Paragraph("High Value Targets", self.heading2_style))
         
-            target_data = [["<b>Subdomain</b>", "<b>Security Score</b>", "<b>Priority</b>"]]
+            target_data = [["Subdomain", "Security Score", "Priority"]]
             for target in security_analysis['high_value_targets'][:10]:  # Limit to 10
                 target_data.append([
                     target.get('subdomain', 'N/A'),
@@ -885,11 +921,11 @@ class ReportGenerator:
         if security_analysis.get('recommendations'):
             elements.append(Paragraph("Security Recommendations", self.heading2_style))
         
-            rec_data = [["<b>Priority</b>", "<b>Category</b>", "<b>Action</b>"]]
+            rec_data = [["Priority", "Category", "Action"]]
             for rec in security_analysis['recommendations'][:5]:  # Limit to 5
                 rec_data.append([
                     rec.get('priority', 'N/A'),
-                    rec.get('category', 'N/A'),
+                    Paragraph(rec.get('category', 'N/A'), self.table_cell_style),
                     rec.get('action', 'N/A')[:100] + ('...' if len(rec.get('action', '')) > 100 else '')
                 ])
         
@@ -926,12 +962,12 @@ class ReportGenerator:
         elements.append(Paragraph("Owner Perspective", self.heading2_style))
         
         if owner.get('summary'):
-            elements.append(Paragraph("<b>Security Summary</b>", self.heading2_style))
+            elements.append(Paragraph("Security Summary", self.heading2_style))
             elements.append(Paragraph(owner['summary'], self.body_style))
             elements.append(Spacer(1, 0.1*inch))
         
         if owner.get('key_findings'):
-            elements.append(Paragraph("<b>Key Findings:</b>", self.heading2_style))
+            elements.append(Paragraph("Key Findings:", self.heading2_style))
             finding_items = []
             for finding in owner['key_findings'][:5]:  # Limit to 5
                 finding_items.append(ListItem(Paragraph(finding, self.body_style), bulletColor='blue'))
@@ -940,7 +976,7 @@ class ReportGenerator:
             elements.append(Spacer(1, 0.1*inch))
         
         if owner.get('protection_recommendations'):
-            elements.append(Paragraph("<b>Protection Recommendations:</b>", self.heading2_style))
+            elements.append(Paragraph("Protection Recommendations:", self.heading2_style))
             rec_items = []
             for rec in owner['protection_recommendations'][:5]:  # Limit to 5
                 rec_items.append(ListItem(Paragraph(rec, self.body_style), bulletColor='green'))
@@ -949,7 +985,7 @@ class ReportGenerator:
             elements.append(Spacer(1, 0.1*inch))
         
         if owner.get('immediate_actions'):
-            elements.append(Paragraph("<b>Immediate Actions:</b>", self.heading2_style))
+            elements.append(Paragraph("Immediate Actions:", self.heading2_style))
             action_items = []
             for action in owner['immediate_actions'][:5]:  # Limit to 5
                 action_items.append(ListItem(Paragraph(action, self.body_style), bulletColor='red'))
@@ -963,17 +999,17 @@ class ReportGenerator:
         elements.append(Paragraph("Bug Hunter Perspective", self.heading2_style))
         
         if hunter.get('summary'):
-            elements.append(Paragraph("<b>Hunting Summary</b>", self.heading2_style))
+            elements.append(Paragraph("Hunting Summary", self.heading2_style))
             elements.append(Paragraph(hunter['summary'], self.body_style))
             elements.append(Spacer(1, 0.1*inch))
         
         if hunter.get('promising_targets'):
-            elements.append(Paragraph("<b>Promising Targets:</b>", self.heading2_style))
-            target_data = [["<b>Target</b>", "<b>Reason</b>"]]
+            elements.append(Paragraph("Promising Targets:", self.heading2_style))
+            target_data = [["Target", "Reason"]]
             for target in hunter['promising_targets'][:5]:  # Limit to 5
                 target_data.append([
-                    target.get('target', 'N/A'),
-                    target.get('reason', 'N/A')
+                    Paragraph(target.get('target', 'N/A'), self.table_cell_style),
+                    Paragraph(target.get('reason', 'N/A'), self.table_cell_style),
                 ])
             
             target_table = Table(target_data, colWidths=[2*inch, 3*inch])
@@ -993,11 +1029,11 @@ class ReportGenerator:
             elements.append(Spacer(1, 0.1*inch))
         
         if hunter.get('attack_vectors'):
-            elements.append(Paragraph("<b>Attack Vectors:</b>", self.heading2_style))
+            elements.append(Paragraph("Attack Vectors:", self.heading2_style))
             vector_items = []
             for vector in hunter['attack_vectors'][:5]:  # Limit to 5
                 vector_items.append(ListItem(
-                    Paragraph(f"<b>{vector.get('type', 'N/A')}:</b> {vector.get('description', 'N/A')}", 
+                    Paragraph(f"{vector.get('type', 'N/A')}: {vector.get('description', 'N/A')}", 
                     self.body_style),
                     bulletColor='orange'
                 ))
@@ -1006,7 +1042,7 @@ class ReportGenerator:
             elements.append(Spacer(1, 0.1*inch))
         
         if hunter.get('high_value_findings'):
-            elements.append(Paragraph("<b>High Value Findings:</b>", self.heading2_style))
+            elements.append(Paragraph("High Value Findings:", self.heading2_style))
             finding_items = []
             for finding in hunter['high_value_findings'][:5]:  # Limit to 5
                 finding_items.append(ListItem(Paragraph(finding, self.body_style), bulletColor='red'))
