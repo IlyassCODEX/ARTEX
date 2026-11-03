@@ -1,5 +1,4 @@
 # utils/js_secret_extractor.py
-
 import asyncio
 import aiohttp
 import re
@@ -240,30 +239,30 @@ def _is_false_positive(value: str) -> bool:
     if len(set(v)) <= 2 and len(v) > 4:
         return True
     return False
-    
-    
+
+
 def _scan_content(content: str, source_url: str) -> list[SecretFinding]:
-    findings: list[SecretFindings] = []
+    findings: list[SecretFinding] = []
     seen: set[str] = set()
-    
+
     for secret_type, pattern in SECRET_PATTERNS:
         for m in pattern.finditer(content):
             raw = m.group(0)
             matched_groups = m.groups()
             representative = matched_groups[-1] if matched_groups else raw
-            
+
             if _is_false_positive(representative):
                 continue
-                
+
             fp = _make_fingerprint(secret_type, raw)
             if fp in seen:
                 continue
             seen.add(fp)
-            
+
             line, col = _get_line_col(content, m.start())
             context = _get_context(content, m.start())
             severity = SECRET_SEVERITY.get(secret_type, Severity.INFO)
-            
+
             findings.append(SecretFinding(
                 secret_type=secret_type,
                 severity=severity,
@@ -274,19 +273,19 @@ def _scan_content(content: str, source_url: str) -> list[SecretFinding]:
                 column=col,
                 fingerprint=fp,
             ))
-            
+
     return findings
-    
-    
+
+
 def _extract_js_urls(html: str, base_url: str) -> list[str]:
     urls: set[str] = set()
     parsed_base = urlparse(base_url)
-    
+
     for m in JS_URL_PATTERNS[0].finditer(html):
         raw = m.group(1).strip()
         if raw and not raw.startswith("data:"):
             urls.add(urljoin(base_url, raw))
-            
+
     for m in INLINE_SCRIPT_PATTERN.finditer(html):
         inner = m.group(1)
         for pattern in JS_URL_PATTERNS[1:]:
@@ -297,7 +296,7 @@ def _extract_js_urls(html: str, base_url: str) -> list[str]:
                     c_parsed = urlparse(candidate)
                     if c_parsed.netloc == parsed_base.netloc:
                         urls.add(candidate)
-                
+
     filtered = set()
     for u in urls:
         p = urlparse(u)
@@ -305,10 +304,10 @@ def _extract_js_urls(html: str, base_url: str) -> list[str]:
             filtered.add(u)
         elif p.scheme in ("http", "https") and ".js" in p.path:
             filtered.add(u)
-            
+
     return list(filtered)
-    
-    
+
+
 def _extract_sourcemap_url(content: str, js_url: str) -> Optional[str]:
     m = SOURCEMAP_URL_PATTERN.search(content[-2000:])
     if not m:
@@ -317,8 +316,8 @@ def _extract_sourcemap_url(content: str, js_url: str) -> Optional[str]:
     if raw.startswith("data:"):
         return None
     return urljoin(js_url, raw)
-    
-    
+
+
 async def _fetch_url(
     session: aiohttp.ClientSession,
     url: str,
@@ -350,8 +349,8 @@ async def _fetch_url(
             return 0, "", "timeout"
         except Exception as e:
             return -1, "", str(e)[:120]
-            
-            
+
+
 async def _fetch_js_file(
     session: aiohttp.ClientSession,
     url: str,
@@ -423,3 +422,131 @@ class JSSecretExtractor:
         t_start = time.monotonic()
         connector = aiohttp.TCPConnector(ssl=False, limit=self.concurrency)
         semaphore = asyncio.Semaphore(self.concurrency)
+
+        async with aiohttp.ClientSession(connector=connector) as session:
+            _, html_content, _ = await _fetch_url(session, target_url, self.base_headers, semaphore)
+
+            js_urls = _extract_js_urls(html_content, target_url)
+            js_urls = list(set(js_urls))[: self.max_js_files]
+
+            js_tasks = [
+                _fetch_js_file(session, url, self.base_headers, semaphore)
+                for url in js_urls
+            ]
+            js_files: list[JSFile] = await asyncio.gather(*js_tasks)
+
+            all_findings: list[SecretFinding] = []
+            sourcemaps_found: list[str] = []
+
+            html_findings = _scan_content(html_content, target_url + " [inline]")
+            all_findings.extend(html_findings)
+
+            for jsf in js_files:
+                if jsf.fetch_error or not jsf.content:
+                    continue
+                findings = _scan_content(jsf.content, jsf.url)
+                all_findings.extend(findings)
+
+                if self.follow_sourcemaps and jsf.sourcemap_url:
+                    sourcemaps_found.append(jsf.sourcemap_url)
+                    sm_content = await _fetch_sourcemap(
+                        session, jsf.sourcemap_url, self.base_headers, semaphore
+                    )
+                    if sm_content:
+                        for src_url, src_content in _extract_js_from_sourcemap(sm_content, jsf.sourcemap_url):
+                            src_findings = _scan_content(src_content, src_url + " [sourcemap]")
+                            all_findings.extend(src_findings)
+
+        deduped = _deduplicate_findings(all_findings)
+        severity_count = _count_by_severity(deduped)
+
+        return ExtractionReport(
+            target_url=target_url,
+            js_files_found=len(js_urls),
+            js_files_fetched=sum(1 for j in js_files if j.status_code == 200),
+            total_findings=len(deduped),
+            findings_by_severity=severity_count,
+            findings=deduped,
+            js_files=js_files,
+            sourcemaps_found=sourcemaps_found,
+            duration_seconds=time.monotonic() - t_start,
+        )
+
+    def run_sync(self, target_url: str) -> ExtractionReport:
+        return asyncio.run(self.run(target_url))
+
+
+def _deduplicate_findings(findings: list[SecretFinding]) -> list[SecretFinding]:
+    seen: set[str] = set()
+    result: list[SecretFinding] = []
+    for f in findings:
+        if f.fingerprint not in seen:
+            seen.add(f.fingerprint)
+            result.append(f)
+    result.sort(key=lambda x: list(Severity).index(x.severity))
+    return result
+
+
+def _count_by_severity(findings: list[SecretFinding]) -> dict[str, int]:
+    counts: dict[str, int] = {s.value: 0 for s in Severity}
+    for f in findings:
+        counts[f.severity.value] += 1
+    return counts
+
+
+def _redact(value: str, keep: int = 6) -> str:
+    if len(value) <= keep * 2:
+        return "*" * len(value)
+    return value[:keep] + "..." + value[-keep:]
+
+
+def serialize_report(report: ExtractionReport, redact_values: bool = True) -> dict:
+    def finding_to_dict(f: SecretFinding) -> dict:
+        raw = _redact(f.raw_match) if redact_values else f.raw_match
+        return {
+            "type": f.secret_type.value,
+            "severity": f.severity.value,
+            "raw_match": raw,
+            "context": f.context,
+            "source": f.source_url,
+            "line": f.line_number,
+            "column": f.column,
+            "fingerprint": f.fingerprint,
+        }
+
+    def js_to_dict(j: JSFile) -> dict:
+        return {
+            "url": j.url,
+            "status": j.status_code,
+            "size_bytes": j.size_bytes,
+            "sourcemap": j.sourcemap_url,
+            "error": j.fetch_error,
+        }
+
+    return {
+        "target": report.target_url,
+        "js_files_found": report.js_files_found,
+        "js_files_fetched": report.js_files_fetched,
+        "total_findings": report.total_findings,
+        "duration_seconds": round(report.duration_seconds, 2),
+        "findings_by_severity": report.findings_by_severity,
+        "sourcemaps_found": report.sourcemaps_found,
+        "findings": [finding_to_dict(f) for f in report.findings],
+        "js_files": [js_to_dict(j) for j in report.js_files],
+    }
+
+
+def run_js_secret_extraction(
+    target_url: str,
+    concurrency: int = 10,
+    max_js_files: int = 100,
+    follow_sourcemaps: bool = True,
+    redact_values: bool = True,
+) -> dict:
+    extractor = JSSecretExtractor(
+        concurrency=concurrency,
+        max_js_files=max_js_files,
+        follow_sourcemaps=follow_sourcemaps,
+    )
+    report = extractor.run_sync(target_url)
+    return serialize_report(report, redact_values=redact_values)
