@@ -12,6 +12,7 @@ from modules.tech_detector import TechnologyDetector
 from modules.enumeration import EmailUserEnumerator
 from modules.FastAnalyst import FastSecurityAnalyst # Import FastSecurityAnalyst
 from modules.AI_analyst import AIAnalyst
+from modules.AI_header_analyzer import AIHeaderAnalyzer
 from utils.reporting import ReportGenerator
 from utils.helpers import validate_domain, sanitize_domain
 import os
@@ -246,6 +247,14 @@ def run_scan(scan_id, domain, options):
                     
                 scan_results[scan_id]['tech_detection'] = tech_results
                 scan_status[scan_id]['progress'] = 80
+                
+            if options.get('headers', True):
+                scan_status[scan_id]['current_task'] = 'Analyzing security headers...'
+                header_analyzer = AIHeaderAnalyzer(groq_api_key=GROQ_API_KEY)
+                scan_results[scan_id]['header_analysis'] = header_analyzer.analyze(
+                    domain, subdomains=subdomains, max_targets=10
+                )
+                scan_status[scan_id]['progress'] = 85
             
             # Run security analysis
             scan_status[scan_id]['current_task'] = 'Running security analysis...'
