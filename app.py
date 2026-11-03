@@ -19,6 +19,7 @@ from utils.helpers import validate_domain, sanitize_domain
 from modules.AI_osint_correlator import AIOSINTCorrelator
 from modules.AI_payload_generator import AIPayloadGenerator
 from core.exploit_chain import ExploitChain
+from core.auth_bypass import AuthBypass
 import os
 
 app = Flask(__name__)
@@ -275,6 +276,12 @@ def run_scan(scan_id, domain, options):
                     scan_results=scan_results[scan_id],
                 )
                 scan_status[scan_id]['progress'] = 88
+                
+                ab = AuthBypass()
+                scan_results[scan_id]['auth_bypass'] = ab.run(
+                    domain=domain,
+                    scan_results=scan_results[scan_id],
+                )
                 
                 chain = ExploitChain()
                 scan_results[scan_id]['exploit_chain'] = chain.run(
