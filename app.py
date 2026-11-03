@@ -13,6 +13,7 @@ from modules.enumeration import EmailUserEnumerator
 from modules.FastAnalyst import FastSecurityAnalyst # Import FastSecurityAnalyst
 from modules.AI_analyst import AIAnalyst
 from modules.AI_header_analyzer import AIHeaderAnalyzer
+from modules.AI_subdomain_takeover_analyzer import AISubdomainTakeoverAnalyzer
 from utils.reporting import ReportGenerator
 from utils.helpers import validate_domain, sanitize_domain
 import os
