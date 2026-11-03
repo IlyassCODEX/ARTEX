@@ -19,6 +19,7 @@ from modules.AI_analyst import AIAnalyst
 from modules.AI_header_analyzer import AIHeaderAnalyzer
 from modules.AI_subdomain_takeover_analyzer import AISubdomainTakeoverAnalyzer
 from modules.AI_vuln_prioritizer import AIVulnPrioritizer
+from modules.AI_attack_path_planner import AIAttackPathPlanner
 from utils.reporting import ReportGenerator
 from utils.helpers import validate_domain, sanitize_domain
 from utils.header_injector import HeaderInjector
@@ -327,6 +328,13 @@ def run_scan(scan_id, domain, options):
                 scan_results=scan_results[scan_id],
             )
             scan_status[scan_id]['progress'] = 92
+            
+            planner = AIAttackPathPlanner(groq_api_key=GROQ_API_KEY)
+            scan_results[scan_id]['attack_path_graph'] = planner.plan(
+                domain=domain,
+                scan_results=scan_results[scan_id],
+            )
+            scan_status[scan_id]['progress'] = 95
             
             # Run AI analysis
             scan_status[scan_id]['current_task'] = 'Generating AI insights...'
