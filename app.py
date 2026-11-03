@@ -16,6 +16,8 @@ from modules.AI_header_analyzer import AIHeaderAnalyzer
 from modules.AI_subdomain_takeover_analyzer import AISubdomainTakeoverAnalyzer
 from utils.reporting import ReportGenerator
 from utils.helpers import validate_domain, sanitize_domain
+from modules.AI_osint_correlator import AIOSINTCorrelator
+from modules.AI_payload_generator import AIPayloadGenerator
 import os
 
 app = Flask(__name__)
@@ -122,6 +124,10 @@ def run_scan(scan_id, domain, options):
                 subdomain_enum = SubdomainEnumerator()
                 subdomains = subdomain_enum.enumerate(domain)
                 scan_results[scan_id]['subdomains'] = subdomains
+                takeover_analyzer = AISubdomainTakeoverAnalyzer(groq_api_key=GROQ_API_KEY)
+                scan_results[scan_id]['takeover_analysis'] = takeover_analyzer.analyze(
+                    domain, subdomains=subdomains, max_targets=50
+                )
                 scan_status[scan_id]['progress'] = 20
 
             # Run email enumeration if selected
@@ -205,6 +211,19 @@ def run_scan(scan_id, domain, options):
                     # Fix: Access CDN ranges through the ip_utils attribute
                     'techniques_used': list(real_ip_discovery.ip_utils.cdn_ranges.keys())
                 }
+                correlator = AIOSINTCorrelator(
+                    groq_api_key=GROQ_API_KEY,
+                    shodan_key=os.getenv('SHODAN_API_KEY'),
+                    vt_key=os.getenv('VIRUSTOTAL_API_KEY'),
+                    hunter_key=os.getenv('HUNTER_API_KEY'),
+                    sectrails_key=os.getenv('SECURITYTRAILS_API_KEY'),
+                    github_token=os.getenv('GITHUB_TOKEN'),
+                )
+                scan_results[scan_id]['osint_correlation'] = correlator.correlate(
+                    domain=domain,
+                    scan_results=scan_results[scan_id],
+                    deep=options.get('intensity') == 'aggressive',
+                )
                 scan_status[scan_id]['progress'] = 60  # Updated progress value
 
 
@@ -248,6 +267,13 @@ def run_scan(scan_id, domain, options):
                     
                 scan_results[scan_id]['tech_detection'] = tech_results
                 scan_status[scan_id]['progress'] = 80
+                
+                generator = AIPayloadGenerator(groq_api_key=GROQ_API_KEY)
+                scan_results[scan_id]['payload_analysis'] = generator.generate(
+                    domain=domain,
+                    scan_results=scan_results[scan_id],
+                )
+                scan_status[scan_id]['progress'] = 88
                 
             if options.get('headers', True):
                 scan_status[scan_id]['current_task'] = 'Analyzing security headers...'
