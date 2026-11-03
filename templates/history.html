@@ -1,0 +1,562 @@
+{% extends "base.html" %}
+
+{% block title %}Scan History | ARTEX{% endblock %}
+
+{% block extra_css %}
+<style>
+    .history-header {
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+        border-radius: var(--border-radius);
+        padding: 2rem;
+        color: white;
+        margin-bottom: 2rem;
+    }
+
+    .history-header h2 {
+        font-weight: 700;
+        margin-bottom: 0.25rem;
+    }
+
+    .history-header p {
+        opacity: 0.85;
+        margin-bottom: 0;
+    }
+
+    .scan-card {
+        border: none;
+        border-radius: var(--border-radius);
+        box-shadow: var(--box-shadow);
+        background: white;
+        transition: var(--transition);
+        margin-bottom: 1rem;
+        overflow: hidden;
+    }
+
+    .scan-card:hover {
+        box-shadow: 0 10px 20px -4px rgba(0, 0, 0, 0.12);
+        transform: translateY(-2px);
+    }
+
+    .scan-card-body {
+        padding: 1.25rem 1.5rem;
+    }
+
+    .scan-domain {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--dark-color);
+        margin-bottom: 0.25rem;
+        word-break: break-all;
+    }
+
+    .scan-id-text {
+        font-size: 0.75rem;
+        color: #94a3b8;
+        font-family: monospace;
+    }
+
+    .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0.3rem 0.85rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+
+    .status-completed {
+        background-color: rgba(16, 185, 129, 0.1);
+        color: var(--success-color);
+    }
+
+    .status-running {
+        background-color: rgba(59, 130, 246, 0.1);
+        color: var(--info-color);
+    }
+
+    .status-error {
+        background-color: rgba(239, 68, 68, 0.1);
+        color: var(--danger-color);
+    }
+
+    .status-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: currentColor;
+    }
+
+    .status-running .status-dot {
+        animation: pulse-dot 1.2s ease-in-out infinite;
+    }
+
+    @keyframes pulse-dot {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.3; }
+    }
+
+    .meta-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin-top: 0.75rem;
+    }
+
+    .meta-item {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 0.82rem;
+        color: #64748b;
+    }
+
+    .meta-item i {
+        font-size: 0.85rem;
+        color: #94a3b8;
+    }
+
+    .option-badges {
+        margin-top: 0.75rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+    }
+
+    .option-badge {
+        font-size: 0.72rem;
+        padding: 0.2rem 0.6rem;
+        border-radius: 12px;
+        background-color: var(--primary-light);
+        color: var(--primary-color);
+        font-weight: 500;
+    }
+
+    .action-col {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.5rem;
+        flex-shrink: 0;
+    }
+
+    .btn-action {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 0.45rem 1rem;
+        border-radius: var(--border-radius);
+        font-size: 0.83rem;
+        font-weight: 500;
+        border: none;
+        transition: var(--transition);
+        white-space: nowrap;
+    }
+
+    .btn-view {
+        background-color: var(--primary-color);
+        color: white;
+    }
+
+    .btn-view:hover {
+        background-color: var(--secondary-color);
+        color: white;
+    }
+
+    .btn-export {
+        background-color: #f1f5f9;
+        color: #475569;
+    }
+
+    .btn-export:hover {
+        background-color: #e2e8f0;
+        color: var(--dark-color);
+    }
+
+    .btn-resume {
+        background-color: rgba(59, 130, 246, 0.1);
+        color: var(--info-color);
+    }
+
+    .btn-resume:hover {
+        background-color: rgba(59, 130, 246, 0.2);
+        color: var(--info-color);
+    }
+
+    .progress-mini {
+        height: 4px;
+        border-radius: 2px;
+        background-color: #e2e8f0;
+        margin-top: 0.75rem;
+        overflow: hidden;
+    }
+
+    .progress-mini-bar {
+        height: 100%;
+        border-radius: 2px;
+        background-color: var(--info-color);
+        transition: width 0.4s ease;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+        color: #94a3b8;
+    }
+
+    .empty-state i {
+        font-size: 3.5rem;
+        margin-bottom: 1rem;
+        display: block;
+        color: #cbd5e1;
+    }
+
+    .empty-state h5 {
+        color: #64748b;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+
+    .summary-bar {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+        margin-bottom: 1.5rem;
+    }
+
+    .summary-chip {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: white;
+        border-radius: var(--border-radius);
+        padding: 0.5rem 1rem;
+        box-shadow: var(--box-shadow);
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: #475569;
+    }
+
+    .summary-chip span.count {
+        font-weight: 700;
+        font-size: 1rem;
+        color: var(--primary-color);
+    }
+
+    .filter-row {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1.25rem;
+        flex-wrap: wrap;
+    }
+
+    .filter-btn {
+        padding: 0.35rem 0.9rem;
+        border-radius: 20px;
+        border: 1.5px solid #e2e8f0;
+        background: white;
+        font-size: 0.82rem;
+        font-weight: 500;
+        color: #64748b;
+        cursor: pointer;
+        transition: var(--transition);
+    }
+
+    .filter-btn:hover,
+    .filter-btn.active {
+        border-color: var(--primary-color);
+        color: var(--primary-color);
+        background-color: var(--primary-light);
+    }
+
+    .scan-card.hidden {
+        display: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="history-header">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <div>
+            <h2><i class="bi bi-clock-history me-2"></i>Scan History</h2>
+            <p>All scans run in this session</p>
+        </div>
+        <a href="/" class="btn btn-light fw-medium">
+            <i class="bi bi-plus-circle me-2"></i>New Scan
+        </a>
+    </div>
+</div>
+
+<!-- Summary bar -->
+<div class="summary-bar" id="summaryBar"></div>
+
+<!-- Filter row -->
+<div class="filter-row">
+    <button class="filter-btn active" data-filter="all">All</button>
+    <button class="filter-btn" data-filter="completed">Completed</button>
+    <button class="filter-btn" data-filter="running">Running</button>
+    <button class="filter-btn" data-filter="error">Error</button>
+</div>
+
+<!-- Scan list -->
+<div id="scanList">
+    <div class="empty-state" id="emptyState">
+        <i class="bi bi-inbox"></i>
+        <h5>No scans yet</h5>
+        <p class="mb-3">Run your first scan to see history here.</p>
+        <a href="/" class="btn btn-modern">
+            <i class="bi bi-search me-2"></i>Start a Scan
+        </a>
+    </div>
+</div>
+
+<!-- No results after filter -->
+<div class="empty-state" id="noFilterResults" style="display:none;">
+    <i class="bi bi-funnel"></i>
+    <h5>No scans match this filter</h5>
+    <p class="mb-0">Try a different filter or start a new scan.</p>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function () {
+
+    /* ── fetch history from API ── */
+    function loadHistory() {
+        $.get('/history_data')
+            .done(renderHistory)
+            .fail(function () {
+                $('#scanList').html(
+                    '<div class="alert alert-danger alert-modern">' +
+                    '<i class="bi bi-exclamation-triangle-fill me-2"></i>' +
+                    'Could not load history. Is the /history_data route registered?' +
+                    '</div>'
+                );
+            });
+    }
+
+    /* ── render ── */
+    function renderHistory(data) {
+        const scans = data.scans || [];
+
+        // summary
+        const total     = scans.length;
+        const completed = scans.filter(s => s.status === 'completed').length;
+        const running   = scans.filter(s => s.status === 'running').length;
+        const errors    = scans.filter(s => s.status === 'error').length;
+
+        $('#summaryBar').html(
+            chip('bi-list-ul',      total,     'Total') +
+            chip('bi-check-circle', completed, 'Completed') +
+            chip('bi-arrow-repeat', running,   'Running') +
+            chip('bi-x-circle',     errors,    'Errors')
+        );
+
+        if (scans.length === 0) {
+            $('#emptyState').show();
+            return;
+        }
+        $('#emptyState').hide();
+
+        const cards = scans.map(buildCard).join('');
+        $('#scanList').html(cards);
+
+        // live-update running scans
+        scans.filter(s => s.status === 'running').forEach(function (s) {
+            pollProgress(s.scan_id);
+        });
+    }
+
+    function chip(icon, count, label) {
+        return `<div class="summary-chip">
+            <i class="bi ${icon}"></i>
+            <span class="count">${count}</span> ${label}
+        </div>`;
+    }
+
+    /* ── card builder ── */
+    function buildCard(s) {
+        const statusPill  = statusHTML(s.status, s.progress || 0);
+        const optBadges   = optionBadges(s.options || {});
+        const progressBar = s.status === 'running'
+            ? `<div class="progress-mini"><div class="progress-mini-bar" id="prog-${s.scan_id}" style="width:${s.progress || 0}%"></div></div>`
+            : '';
+        const actions = buildActions(s);
+
+        return `
+        <div class="scan-card" data-status="${s.status}" data-id="${s.scan_id}">
+            <div class="scan-card-body d-flex justify-content-between align-items-start flex-wrap gap-3">
+                <div style="min-width:0;flex:1;">
+                    <div class="scan-domain">${escHtml(s.domain)}</div>
+                    <div class="scan-id-text">${s.scan_id}</div>
+                    <div class="meta-row">
+                        ${statusPill}
+                        <span class="meta-item"><i class="bi bi-calendar3"></i>${formatDate(s.start_time)}</span>
+                        ${s.duration ? `<span class="meta-item"><i class="bi bi-stopwatch"></i>${s.duration}</span>` : ''}
+                        ${s.status === 'running'
+                            ? `<span class="meta-item" id="task-${s.scan_id}"><i class="bi bi-cpu"></i>${escHtml(s.current_task || '')}</span>`
+                            : ''}
+                    </div>
+                    ${optBadges}
+                    ${progressBar}
+                </div>
+                <div class="action-col">${actions}</div>
+            </div>
+        </div>`;
+    }
+
+    function statusHTML(status, progress) {
+        const map = {
+            completed: ['status-completed', 'bi-check-circle-fill', 'Completed'],
+            running:   ['status-running',   'bi-arrow-repeat',      'Running'],
+            error:     ['status-error',     'bi-x-circle-fill',     'Error'],
+        };
+        const [cls, icon, label] = map[status] || ['status-running', 'bi-question-circle', status];
+        return `<span class="status-pill ${cls}">
+            <span class="status-dot"></span>
+            <i class="bi ${icon}"></i>${label}
+            ${status === 'running' ? `<span id="pct-${arguments[0]}">${progress}%</span>` : ''}
+        </span>`;
+    }
+
+    function buildActions(s) {
+        if (s.status === 'completed') {
+            return `
+            <a href="/results/${s.scan_id}" class="btn-action btn-view">
+                <i class="bi bi-file-earmark-bar-graph"></i>View
+            </a>
+            <div class="dropdown">
+                <button class="btn-action btn-export dropdown-toggle" data-bs-toggle="dropdown">
+                    <i class="bi bi-download"></i>Export
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a class="dropdown-item" href="/export/${s.scan_id}?format=json">
+                        <i class="bi bi-filetype-json me-2"></i>JSON
+                    </a></li>
+                    <li><a class="dropdown-item" href="/export/${s.scan_id}?format=pdf">
+                        <i class="bi bi-filetype-pdf me-2"></i>PDF
+                    </a></li>
+                </ul>
+            </div>`;
+        }
+        if (s.status === 'running') {
+            return `<a href="/loading/${s.scan_id}" class="btn-action btn-resume">
+                <i class="bi bi-eye"></i>Watch
+            </a>`;
+        }
+        if (s.status === 'error') {
+            return `<a href="/" class="btn-action btn-export">
+                <i class="bi bi-arrow-counterclockwise"></i>Retry
+            </a>`;
+        }
+        return '';
+    }
+
+    function optionBadges(opts) {
+        const map = {
+            subdomains: 'Subdomains',
+            ports:      'Ports',
+            dns:        'DNS',
+            tech:       'Tech',
+            email:      'Emails',
+            ssl:        'SSL',
+            ai:         'AI',
+        };
+        const badges = Object.entries(map)
+            .filter(([k]) => opts[k])
+            .map(([, v]) => `<span class="option-badge">${v}</span>`)
+            .join('');
+        return badges ? `<div class="option-badges">${badges}</div>` : '';
+    }
+
+    /* ── live progress polling ── */
+    function pollProgress(scanId) {
+        const interval = setInterval(function () {
+            $.get('/scan_status/' + scanId)
+                .done(function (s) {
+                    $(`#prog-${scanId}`).css('width', s.progress + '%');
+                    $(`#pct-${scanId}`).text(s.progress + '%');
+                    $(`#task-${scanId} `).html(
+                        `<i class="bi bi-cpu"></i>${escHtml(s.current_task || '')}`
+                    );
+
+                    if (s.status === 'completed' || s.status === 'error') {
+                        clearInterval(interval);
+                        // reload card to reflect final state
+                        const card = $(`[data-id="${scanId}"]`);
+                        card.attr('data-status', s.status);
+                        if (s.status === 'completed') {
+                            card.find('.status-pill')
+                                .attr('class', 'status-pill status-completed')
+                                .html('<span class="status-dot"></span><i class="bi bi-check-circle-fill"></i>Completed');
+                            card.find('.action-col').html(`
+                                <a href="/results/${scanId}" class="btn-action btn-view">
+                                    <i class="bi bi-file-earmark-bar-graph"></i>View
+                                </a>`);
+                            card.find('.progress-mini').remove();
+                        } else {
+                            card.find('.status-pill')
+                                .attr('class', 'status-pill status-error')
+                                .html('<span class="status-dot"></span><i class="bi bi-x-circle-fill"></i>Error');
+                        }
+                        loadSummary();
+                    }
+                })
+                .fail(function () { clearInterval(interval); });
+        }, 2500);
+    }
+
+    function loadSummary() {
+        // recount from DOM
+        const all  = $('.scan-card').length;
+        const comp = $('.scan-card[data-status="completed"]').length;
+        const run  = $('.scan-card[data-status="running"]').length;
+        const err  = $('.scan-card[data-status="error"]').length;
+        $('#summaryBar').html(
+            chip('bi-list-ul',      all,  'Total') +
+            chip('bi-check-circle', comp, 'Completed') +
+            chip('bi-arrow-repeat', run,  'Running') +
+            chip('bi-x-circle',     err,  'Errors')
+        );
+    }
+
+    /* ── filter ── */
+    $(document).on('click', '.filter-btn', function () {
+        $('.filter-btn').removeClass('active');
+        $(this).addClass('active');
+        const f = $(this).data('filter');
+        const cards = $('.scan-card');
+        if (f === 'all') {
+            cards.removeClass('hidden');
+        } else {
+            cards.each(function () {
+                $(this).toggleClass('hidden', $(this).data('status') !== f);
+            });
+        }
+        const visible = cards.filter(':not(.hidden)').length;
+        $('#noFilterResults').toggle(visible === 0 && cards.length > 0);
+    });
+
+    /* ── helpers ── */
+    function escHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function formatDate(iso) {
+        if (!iso) return '—';
+        try {
+            return new Date(iso).toLocaleString(undefined, {
+                month: 'short', day: 'numeric',
+                hour: '2-digit', minute: '2-digit'
+            });
+        } catch (_) { return iso; }
+    }
+
+    loadHistory();
+});
+</script>
+{% endblock %}
