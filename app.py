@@ -10,6 +10,10 @@ from modules.dns_scan import DNSScanner
 from modules.ssl_scanner import SSLScanner
 from modules.tech_detector import TechnologyDetector
 from modules.enumeration import EmailUserEnumerator
+from modules.db_file_hunter import DBFileHunter
+from modules.vhost_fuzzer import VHostFuzzer
+from modules.dir_bruteforce import DirectoryBruteforcer
+from modules.web_vuln_scanner import WebVulnScanner
 from modules.FastAnalyst import FastSecurityAnalyst # Import FastSecurityAnalyst
 from modules.AI_analyst import AIAnalyst
 from modules.AI_header_analyzer import AIHeaderAnalyzer
