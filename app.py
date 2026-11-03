@@ -20,6 +20,7 @@ from modules.AI_osint_correlator import AIOSINTCorrelator
 from modules.AI_payload_generator import AIPayloadGenerator
 from core.exploit_chain import ExploitChain
 from core.auth_bypass import AuthBypass
+from core.cve_matcher import CveMatcher
 import os
 
 app = Flask(__name__)
@@ -250,6 +251,12 @@ def run_scan(scan_id, domain, options):
     
                 scan_results[scan_id]['ssl_scan'] = ssl_results
                 scan_status[scan_id]['progress'] = 70
+                
+                cvm = CveMatcher()
+                scan_results[scan_id]['cve_matches'] = cvm.run(
+                    domain=domain,
+                    scan_results=scan_results[scan_id],
+                )
 
             # Run technology detection
             if options.get('tech', True):
