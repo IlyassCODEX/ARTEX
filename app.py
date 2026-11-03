@@ -20,6 +20,7 @@ from modules.AI_header_analyzer import AIHeaderAnalyzer
 from modules.AI_subdomain_takeover_analyzer import AISubdomainTakeoverAnalyzer
 from utils.reporting import ReportGenerator
 from utils.helpers import validate_domain, sanitize_domain
+from utils.header_injector import HeaderInjector
 from modules.AI_osint_correlator import AIOSINTCorrelator
 from modules.AI_payload_generator import AIPayloadGenerator
 from core.exploit_chain import ExploitChain
