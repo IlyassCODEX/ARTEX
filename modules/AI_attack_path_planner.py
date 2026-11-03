@@ -1,24 +1,24 @@
 # AI_attack_path_planner.py
 # reads from confirmed scan_results keys:
-#   subdomains        → [{subdomain, ip, http_status, https_status, title}]
-#   port_scan         → [{target, ports:[{port,service,state,risk}], risky_ports, vulnerabilities, os_guess}]
-#   ssl_scan          → {host: {vulnerabilities:{heartbleed:bool,...}, grade, protocols}}
-#   dns_records       → {A:[], MX:[], NS:[], TXT:[], SPF:[]}
-#   real_ip           → {origin_ips:[], techniques_used:[]}
-#   tech_detection    → {url: {technologies:[{name,version,category}]}}
-#   email_enumeration → {found_emails:[{email,type,confidence}], login_pages:[{url,type,source}],
+#   subdomains        -> [{subdomain, ip, http_status, https_status, title}]
+#   port_scan         -> [{target, ports:[{port,service,state,risk}], risky_ports, vulnerabilities, os_guess}]
+#   ssl_scan          -> {host: {vulnerabilities:{heartbleed:bool,...}, grade, protocols}}
+#   dns_records       -> {A:[], MX:[], NS:[], TXT:[], SPF:[]}
+#   real_ip           -> {origin_ips:[], techniques_used:[]}
+#   tech_detection    -> {url: {technologies:[{name,version,category}]}}
+#   email_enumeration -> {found_emails:[{email,type,confidence}], login_pages:[{url,type,source}],
 #                        password_reset_pages:[{url}], email_formats:[{pattern,confidence}]}
-#   security_analysis → {high_value_targets:[{subdomain,security_score,risk_level,reasons}],
+#   security_analysis -> {high_value_targets:[{subdomain,security_score,risk_level,reasons}],
 #                        risk_assessment:{level,score,factors}, attack_surface:{vectors:[]}}
-#   header_analysis   → {targets:{url:{findings:[{type,header,severity,attack_class}]}}}
-#   takeover_analysis → {vulnerable:[{subdomain,service,confidence_level,cname_chain}],
+#   header_analysis   -> {targets:{url:{findings:[{type,header,severity,attack_class}]}}}
+#   takeover_analysis -> {vulnerable:[{subdomain,service,confidence_level,cname_chain}],
 #                        dangling_dns:[{subdomain,dangling_reason}]}
-#   payload_analysis  → {vuln_classes:[], tech_profile:{language,framework,database,cms,cdn_waf},
+#   payload_analysis  -> {vuln_classes:[], tech_profile:{language,framework,database,cms,cdn_waf},
 #                        waf_detected:{detected,name}, injection_points:[{surface,url,method,param_type}]}
-#   osint_correlation → {infrastructure:{all_ips,cloud_ips}, emails:[],
+#   osint_correlation -> {infrastructure:{all_ips,cloud_ips}, emails:[],
 #                        credential_leaks:{github_hits,secret_signals},
 #                        dns_intelligence:{spf_analysis,dmarc_analysis,open_resolver}}
-#   vuln_prioritization → {findings:[{vuln_id,title,severity,final_score,source,affected_asset,
+#   vuln_prioritization -> {findings:[{vuln_id,title,severity,final_score,source,affected_asset,
 #                           business_tags,attack_vector}], attack_chains:[{chain_name,severity,steps}]}
 
 import json
