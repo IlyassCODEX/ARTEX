@@ -2,16 +2,16 @@
 # lang: Python 3.8+, file: modules/AI_vuln_prioritizer.py
 # target: ARTEX v2.0 — slot as final step before ai_analysis in run_scan()
 # reads from scan_results keys (all confirmed from source):
-#   port_scan          → host_data['risky_ports'], host_data['vulnerabilities'], host_data['ports']
-#   ssl_scan           → per-domain dict with 'vulnerabilities' (heartbleed/poodle/etc), 'grade', 'protocols'
-#   security_analysis  → FastSecurityAnalyst output: 'risk_assessment', 'high_value_targets', 'attack_surface'
-#   header_analysis    → AIHeaderAnalyzer output: 'targets'[url]['findings'] with severity field
-#   takeover_analysis  → AISubdomainTakeoverAnalyzer output: 'vulnerable', 'dangling_dns'
-#   payload_analysis   → AIPayloadGenerator output: 'vuln_classes', 'waf_detected', 'tech_profile'
-#   osint_correlation  → AIOSINTCorrelator output: 'credential_leaks', 'reputation', 'dns_intelligence'
-#   subdomains         → list of subdomain dicts with http_status/https_status/ip
-#   tech_detection     → {url: {technologies: [{name, version, category}]}}
-#   dns_records        → {A:[], MX:[], SPF:[], TXT:[], NS:[]}
+#   port_scan          -> host_data['risky_ports'], host_data['vulnerabilities'], host_data['ports']
+#   ssl_scan           -> per-domain dict with 'vulnerabilities' (heartbleed/poodle/etc), 'grade', 'protocols'
+#   security_analysis  -> FastSecurityAnalyst output: 'risk_assessment', 'high_value_targets', 'attack_surface'
+#   header_analysis    -> AIHeaderAnalyzer output: 'targets'[url]['findings'] with severity field
+#   takeover_analysis  -> AISubdomainTakeoverAnalyzer output: 'vulnerable', 'dangling_dns'
+#   payload_analysis   ->,AIPayloadGenerator output: 'vuln_classes', 'waf_detected', 'tech_profile'
+#   osint_correlation  -> AIOSINTCorrelator output: 'credential_leaks', 'reputation', 'dns_intelligence'
+#   subdomains         -> list of subdomain dicts with http_status/https_status/ip
+#   tech_detection     -> {url: {technologies: [{name, version, category}]}}
+#   dns_records        -> {A:[], MX:[], SPF:[], TXT:[], NS:[]}
 # depends: requests (Groq call only)
 
 import json
