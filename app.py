@@ -18,6 +18,7 @@ from modules.FastAnalyst import FastSecurityAnalyst # Import FastSecurityAnalyst
 from modules.AI_analyst import AIAnalyst
 from modules.AI_header_analyzer import AIHeaderAnalyzer
 from modules.AI_subdomain_takeover_analyzer import AISubdomainTakeoverAnalyzer
+from modules.AI_vuln_prioritizer import AIVulnPrioritizer
 from utils.reporting import ReportGenerator
 from utils.helpers import validate_domain, sanitize_domain
 from utils.header_injector import HeaderInjector
@@ -319,6 +320,13 @@ def run_scan(scan_id, domain, options):
             if options.get('email', True):
                 security_analysis['email_analysis'] = email_results
                 scan_results[scan_id]['security_analysis'] = security_analysis
+                
+            prioritizer = AIVulnPrioritizer(groq_api_key=GROQ_API_KEY)
+            scan_results[scan_id]['vuln_prioritization'] = prioritizer.prioritize(
+                domain=domain,
+                scan_results=scan_results[scan_id],
+            )
+            scan_status[scan_id]['progress'] = 92
             
             # Run AI analysis
             scan_status[scan_id]['current_task'] = 'Generating AI insights...'
