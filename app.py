@@ -18,6 +18,7 @@ from utils.reporting import ReportGenerator
 from utils.helpers import validate_domain, sanitize_domain
 from modules.AI_osint_correlator import AIOSINTCorrelator
 from modules.AI_payload_generator import AIPayloadGenerator
+from core.exploit_chain import ExploitChain
 import os
 
 app = Flask(__name__)
@@ -274,6 +275,12 @@ def run_scan(scan_id, domain, options):
                     scan_results=scan_results[scan_id],
                 )
                 scan_status[scan_id]['progress'] = 88
+                
+                chain = ExploitChain()
+                scan_results[scan_id]['exploit_chain'] = chain.run(
+                    domain=domain,
+                    scan_results=scan_results[scan_id],
+                )
                 
             if options.get('headers', True):
                 scan_status[scan_id]['current_task'] = 'Analyzing security headers...'
