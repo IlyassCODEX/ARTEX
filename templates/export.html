@@ -1,0 +1,528 @@
+{% extends "base.html" %}
+
+{% block title %}Export — {{ results.domain }} | ARTEX{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ── page chrome ── */
+    .export-hero {
+        background: linear-gradient(135deg, var(--dark-color) 0%, #312e81 100%);
+        border-radius: 14px;
+        padding: 2.5rem 2rem;
+        color: white;
+        margin-bottom: 2.5rem;
+        position: relative;
+        overflow: hidden;
+    }
+    .export-hero::after {
+        content: '';
+        position: absolute;
+        right: -80px; top: -80px;
+        width: 300px; height: 300px;
+        border-radius: 50%;
+        border: 50px solid rgba(255,255,255,0.04);
+        pointer-events: none;
+    }
+    .export-hero h2 { font-weight: 800; margin-bottom: 0.25rem; }
+    .export-hero p  { opacity: .75; margin-bottom: 0; font-size: .92rem; }
+
+    .domain-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        background: rgba(255,255,255,.12);
+        border: 1px solid rgba(255,255,255,.2);
+        backdrop-filter: blur(6px);
+        border-radius: 24px;
+        padding: .35rem 1rem;
+        font-size: .82rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+    }
+
+    /* ── meta strip ── */
+    .meta-strip {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .75rem;
+        margin-bottom: 2rem;
+    }
+    .meta-chip {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: white;
+        border-radius: var(--border-radius);
+        padding: .45rem .9rem;
+        box-shadow: var(--box-shadow);
+        font-size: .82rem;
+        font-weight: 500;
+        color: #475569;
+    }
+    .meta-chip i { color: var(--primary-color); }
+
+    /* ── format cards ── */
+    .format-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 1.1rem;
+        margin-bottom: 2.5rem;
+    }
+    .format-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: var(--box-shadow);
+        padding: 1.75rem 1.5rem;
+        border: 2px solid transparent;
+        cursor: pointer;
+        transition: var(--transition);
+        position: relative;
+        overflow: hidden;
+    }
+    .format-card::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+        opacity: 0;
+        transition: opacity .2s ease;
+    }
+    .format-card:hover,
+    .format-card.selected {
+        border-color: var(--primary-color);
+        box-shadow: 0 8px 24px -4px rgba(67,97,238,.18);
+        transform: translateY(-2px);
+    }
+    .format-card:hover::before,
+    .format-card.selected::before { opacity: 1; }
+
+    .format-check {
+        position: absolute;
+        top: .9rem; right: .9rem;
+        width: 22px; height: 22px;
+        border-radius: 50%;
+        background: var(--primary-color);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: .7rem;
+        opacity: 0;
+        transition: opacity .2s ease;
+    }
+    .format-card.selected .format-check { opacity: 1; }
+
+    .format-icon {
+        width: 52px; height: 52px;
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+    }
+    .format-title {
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--dark-color);
+        margin-bottom: .3rem;
+    }
+    .format-desc {
+        font-size: .8rem;
+        color: #64748b;
+        line-height: 1.55;
+        margin-bottom: 1rem;
+    }
+    .format-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .35rem;
+    }
+    .format-tag {
+        font-size: .7rem;
+        font-weight: 600;
+        padding: .15rem .55rem;
+        border-radius: 10px;
+        background: var(--primary-light);
+        color: var(--primary-color);
+    }
+
+    /* ── preview panel ── */
+    .preview-wrap {
+        background: white;
+        border-radius: 12px;
+        box-shadow: var(--box-shadow);
+        overflow: hidden;
+        margin-bottom: 2.5rem;
+    }
+    .preview-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem 1.5rem;
+        background: #f8fafc;
+        border-bottom: 1px solid #e2e8f0;
+        font-size: .85rem;
+        font-weight: 600;
+        color: #64748b;
+    }
+    .preview-header i { color: var(--primary-color); margin-right: 6px; }
+    .preview-body {
+        padding: 1.5rem;
+    }
+    .preview-code {
+        background: #0f172a;
+        color: #e2e8f0;
+        border-radius: 8px;
+        padding: 1.25rem;
+        font-family: 'Courier New', monospace;
+        font-size: .78rem;
+        line-height: 1.65;
+        overflow-x: auto;
+        max-height: 320px;
+        overflow-y: auto;
+        margin: 0;
+    }
+    .preview-code .ck  { color: #94a3b8; }  /* key */
+    .preview-code .cv  { color: #7dd3fc; }  /* value */
+    .preview-code .cn  { color: #f9a8d4; }  /* number */
+    .preview-code .cs  { color: #86efac; }  /* string */
+
+    /* PDF preview */
+    .pdf-preview {
+        background: #f1f5f9;
+        border-radius: 8px;
+        padding: 1.5rem;
+    }
+    .pdf-page {
+        background: white;
+        border-radius: 6px;
+        box-shadow: 0 4px 16px rgba(0,0,0,.1);
+        padding: 2rem;
+        max-width: 540px;
+        margin: 0 auto;
+        font-size: .82rem;
+        color: #1e1b4b;
+    }
+    .pdf-page h3 {
+        font-size: 1.1rem;
+        font-weight: 800;
+        margin-bottom: .25rem;
+        color: var(--dark-color);
+    }
+    .pdf-page .pdf-domain {
+        font-size: .75rem;
+        color: #64748b;
+        margin-bottom: 1rem;
+        padding-bottom: 1rem;
+        border-bottom: 2px solid var(--primary-color);
+    }
+    .pdf-section-title {
+        font-size: .7rem;
+        font-weight: 700;
+        letter-spacing: .07em;
+        text-transform: uppercase;
+        color: var(--primary-color);
+        margin-bottom: .5rem;
+        margin-top: 1rem;
+    }
+    .pdf-row {
+        display: flex;
+        justify-content: space-between;
+        padding: .3rem 0;
+        border-bottom: 1px solid #f1f5f9;
+        font-size: .78rem;
+    }
+    .pdf-row span:first-child { color: #64748b; }
+    .pdf-row span:last-child  { font-weight: 600; }
+
+    /* ── download CTA ── */
+    .download-band {
+        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        border-radius: 12px;
+        padding: 2rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 1rem;
+        color: white;
+    }
+    .download-band h5 { font-weight: 700; margin-bottom: .2rem; }
+    .download-band p  { opacity: .8; font-size: .85rem; margin-bottom: 0; }
+    .btn-dl {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        background: white;
+        color: var(--primary-color);
+        border: none;
+        padding: .7rem 1.75rem;
+        border-radius: var(--border-radius);
+        font-weight: 700;
+        font-size: .92rem;
+        text-decoration: none;
+        transition: var(--transition);
+        box-shadow: 0 4px 14px rgba(0,0,0,.15);
+        white-space: nowrap;
+    }
+    .btn-dl:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(0,0,0,.2);
+        color: var(--secondary-color);
+    }
+    .btn-dl-sec {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        background: rgba(255,255,255,.12);
+        border: 1px solid rgba(255,255,255,.25);
+        color: white;
+        padding: .65rem 1.5rem;
+        border-radius: var(--border-radius);
+        font-weight: 600;
+        font-size: .88rem;
+        text-decoration: none;
+        transition: var(--transition);
+    }
+    .btn-dl-sec:hover {
+        background: rgba(255,255,255,.2);
+        color: white;
+    }
+
+    /* ── risk badge (reuse results.html palette) ── */
+    .rbadge {
+        display: inline-block;
+        padding: .2rem .65rem;
+        border-radius: 20px;
+        font-size: .75rem;
+        font-weight: 600;
+    }
+    .rbadge-critical { background:rgba(239,68,68,.1);  color:#ef4444; }
+    .rbadge-high     { background:rgba(245,158,11,.1); color:#f59e0b; }
+    .rbadge-medium   { background:rgba(59,130,246,.1); color:#3b82f6; }
+    .rbadge-low      { background:rgba(16,185,129,.1); color:#10b981; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# ── hero ── #}
+<div class="export-hero">
+    <div class="domain-pill">
+        <i class="bi bi-globe"></i>{{ results.domain }}
+    </div>
+    <h2><i class="bi bi-download me-2"></i>Export Report</h2>
+    <p>Choose a format, preview, then download — all data from scan <code style="opacity:.7;font-size:.78rem;">{{ scan_id }}</code></p>
+</div>
+
+{# ── meta strip ── #}
+<div class="meta-strip">
+    <div class="meta-chip"><i class="bi bi-calendar3"></i>{{ results.timestamp|default('N/A') }}</div>
+    <div class="meta-chip"><i class="bi bi-stopwatch"></i>{{ results.duration|default('N/A') }}</div>
+    <div class="meta-chip"><i class="bi bi-diagram-3"></i>{{ results.subdomains|length }} subdomains</div>
+    {% if results.port_scan %}
+    <div class="meta-chip"><i class="bi bi-plug"></i>{{ results.port_scan|length }} hosts scanned</div>
+    {% endif %}
+    {% if results.security_analysis and results.security_analysis.risk_assessment %}
+    <div class="meta-chip">
+        <i class="bi bi-shield-exclamation"></i>
+        Risk: <strong>{{ results.security_analysis.risk_assessment.level }}</strong>
+        ({{ results.security_analysis.risk_assessment.score }}/100)
+    </div>
+    {% endif %}
+</div>
+
+{# ── format selector ── #}
+<div class="section-eyebrow mb-2" style="display:inline-flex;align-items:center;gap:6px;font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--primary-color);background:var(--primary-light);padding:.3rem .8rem;border-radius:20px;">
+    <i class="bi bi-layout-three-columns"></i> Choose Format
+</div>
+<p style="color:#64748b;font-size:.9rem;margin-bottom:1.25rem;">Click a card to select — preview updates below.</p>
+
+<div class="format-grid">
+
+    {# JSON #}
+    <div class="format-card selected" data-fmt="json" onclick="selectFmt(this)">
+        <div class="format-check"><i class="bi bi-check-lg"></i></div>
+        <div class="format-icon" style="background:rgba(67,97,238,.1);color:var(--primary-color);">
+            <i class="bi bi-filetype-json"></i>
+        </div>
+        <div class="format-title">JSON</div>
+        <div class="format-desc">Complete raw data export — every field, every module, machine-readable. Best for piping into other tools.</div>
+        <div class="format-tags">
+            <span class="format-tag">Machine-readable</span>
+            <span class="format-tag">Complete data</span>
+            <span class="format-tag">Lossless</span>
+        </div>
+    </div>
+
+    {# PDF #}
+    <div class="format-card" data-fmt="pdf" onclick="selectFmt(this)">
+        <div class="format-check"><i class="bi bi-check-lg"></i></div>
+        <div class="format-icon" style="background:rgba(239,68,68,.1);color:#ef4444;">
+            <i class="bi bi-filetype-pdf"></i>
+        </div>
+        <div class="format-title">PDF Report</div>
+        <div class="format-desc">Formatted security report with risk summary, findings, and AI insights. Send to stakeholders or archive.</div>
+        <div class="format-tags">
+            <span class="format-tag">Human-readable</span>
+            <span class="format-tag">Shareable</span>
+            <span class="format-tag">Printable</span>
+        </div>
+    </div>
+
+</div>
+
+{# ── preview panel ── #}
+<div class="preview-wrap" id="previewWrap">
+    <div class="preview-header">
+        <span><i class="bi bi-eye"></i>Preview</span>
+        <span id="previewFmtLabel" style="font-size:.78rem;color:#94a3b8;">JSON — truncated</span>
+    </div>
+    <div class="preview-body">
+
+        {# JSON preview — built by JS #}
+        <div id="jsonPreview">
+            <pre class="preview-code" id="jsonCode"></pre>
+        </div>
+
+        {# PDF preview — static mockup from Jinja data #}
+        <div id="pdfPreview" style="display:none;">
+            <div class="pdf-preview">
+                <div class="pdf-page">
+                    <h3><i class="bi bi-shield-lock me-2" style="color:var(--primary-color);"></i>ARTEX Security Report</h3>
+                    <div class="pdf-domain">
+                        {{ results.domain }} &nbsp;·&nbsp; {{ results.timestamp|default('') }} &nbsp;·&nbsp; Scan ID: {{ scan_id }}
+                    </div>
+
+                    <div class="pdf-section-title">Summary</div>
+                    <div class="pdf-row"><span>Subdomains discovered</span><span>{{ results.subdomains|length }}</span></div>
+                    {% if results.security_analysis and results.security_analysis.summary %}
+                    <div class="pdf-row"><span>Active subdomains</span><span>{{ results.security_analysis.summary.active_subdomains|default('—') }}</span></div>
+                    {% endif %}
+                    {% if results.port_scan %}
+                    <div class="pdf-row"><span>Hosts port-scanned</span><span>{{ results.port_scan|length }}</span></div>
+                    {% endif %}
+                    {% if results.tech_detection %}
+                    <div class="pdf-row"><span>Tech profiles detected</span><span>{{ results.tech_detection|length }}</span></div>
+                    {% endif %}
+                    <div class="pdf-row"><span>Scan duration</span><span>{{ results.duration|default('N/A') }}</span></div>
+
+                    {% if results.security_analysis and results.security_analysis.risk_assessment %}
+                    <div class="pdf-section-title">Risk Assessment</div>
+                    {% set rl = results.security_analysis.risk_assessment.level|lower %}
+                    <div class="pdf-row">
+                        <span>Risk level</span>
+                        <span>
+                            <span class="rbadge rbadge-{{ rl }}">
+                                {{ results.security_analysis.risk_assessment.level }}
+                                ({{ results.security_analysis.risk_assessment.score }}/100)
+                            </span>
+                        </span>
+                    </div>
+                    {% for f in results.security_analysis.risk_assessment.factors[:3] %}
+                    <div class="pdf-row"><span>Factor {{ loop.index }}</span><span>{{ f }}</span></div>
+                    {% endfor %}
+                    {% endif %}
+
+                    {% if results.security_analysis and results.security_analysis.insights %}
+                    <div class="pdf-section-title">Top Insights</div>
+                    {% for ins in results.security_analysis.insights[:4] %}
+                    <div class="pdf-row"><span>{{ loop.index }}</span><span>{{ ins }}</span></div>
+                    {% endfor %}
+                    {% endif %}
+
+                    {% if results.ai_analysis and results.ai_analysis.owner_analysis %}
+                    <div class="pdf-section-title">AI Summary</div>
+                    <div style="font-size:.77rem;color:#475569;line-height:1.6;padding:.5rem 0;">
+                        {{ results.ai_analysis.owner_analysis.summary|default('AI analysis not available.')|truncate(320) }}
+                    </div>
+                    {% endif %}
+
+                    <div style="margin-top:1.5rem;padding-top:1rem;border-top:1px solid #e2e8f0;font-size:.7rem;color:#94a3b8;text-align:center;">
+                        Generated by ARTEX &nbsp;·&nbsp; {{ results.timestamp|default('') }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+{# ── download CTA ── #}
+<div class="download-band">
+    <div>
+        <h5><i class="bi bi-download me-2"></i>Download Report</h5>
+        <p id="dlDesc">Full JSON data — all modules, all fields.</p>
+    </div>
+    <div style="display:flex;gap:.75rem;flex-wrap:wrap;">
+        <a href="/export/{{ scan_id }}?format=json" id="dlPrimary" class="btn-dl">
+            <i class="bi bi-filetype-json"></i>Download JSON
+        </a>
+        <a href="/results/{{ scan_id }}" class="btn-dl-sec">
+            <i class="bi bi-arrow-left"></i>Back to Results
+        </a>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function () {
+
+    /* ── build JSON preview from live API ── */
+    function loadJsonPreview() {
+        $.get('/api/results/{{ scan_id }}')
+            .done(function (d) {
+                /* trim to preview-safe slice */
+                const preview = {
+                    domain:      d.domain,
+                    scan_id:     d.scan_id,
+                    timestamp:   d.timestamp,
+                    duration:    d.duration,
+                    subdomains:  (d.subdomains  || []).slice(0, 3),
+                    port_scan:   (d.port_scan   || []).slice(0, 2),
+                    dns_records: d.dns_records  || {},
+                    risk:        d.security_analysis
+                                    ? d.security_analysis.risk_assessment
+                                    : null,
+                    _note: `... ${(d.subdomains||[]).length} subdomains, full data in download`
+                };
+                $('#jsonCode').text(JSON.stringify(preview, null, 2));
+            })
+            .fail(function () {
+                $('#jsonCode').text('// Could not load preview — download will still work.');
+            });
+    }
+
+    loadJsonPreview();
+
+    /* ── format selector ── */
+    window.selectFmt = function (card) {
+        $('.format-card').removeClass('selected');
+        $(card).addClass('selected');
+        const fmt = $(card).data('fmt');
+
+        if (fmt === 'json') {
+            $('#jsonPreview').show();
+            $('#pdfPreview').hide();
+            $('#previewFmtLabel').text('JSON — truncated');
+            $('#dlPrimary')
+                .attr('href', '/export/{{ scan_id }}?format=json')
+                .html('<i class="bi bi-filetype-json"></i>Download JSON');
+            $('#dlDesc').text('Full JSON data — all modules, all fields.');
+        } else {
+            $('#jsonPreview').hide();
+            $('#pdfPreview').show();
+            $('#previewFmtLabel').text('PDF — layout preview');
+            $('#dlPrimary')
+                .attr('href', '/export/{{ scan_id }}?format=pdf')
+                .html('<i class="bi bi-filetype-pdf"></i>Download PDF');
+            $('#dlDesc').text('Formatted security report — ready to share or archive.');
+        }
+    };
+});
+</script>
+{% endblock %}
