@@ -1,0 +1,369 @@
+{% extends "base.html" %}
+
+{% block title %}{{ error_code|default('Error') }} | ARTEX{% endblock %}
+
+{% block extra_css %}
+<style>
+    .err-wrap {
+        min-height: 68vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 3rem 1rem;
+        text-align: center;
+    }
+
+    /* ── animated code display ── */
+    .err-code-wrap {
+        position: relative;
+        margin-bottom: 2rem;
+    }
+    .err-code {
+        font-size: clamp(5rem, 18vw, 9rem);
+        font-weight: 900;
+        letter-spacing: -.04em;
+        line-height: 1;
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 60%, #818cf8 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        position: relative;
+        z-index: 1;
+    }
+    .err-code-shadow {
+        position: absolute;
+        inset: 0;
+        font-size: clamp(5rem, 18vw, 9rem);
+        font-weight: 900;
+        letter-spacing: -.04em;
+        line-height: 1;
+        color: rgba(67,97,238,.06);
+        transform: translate(6px, 6px);
+        z-index: 0;
+        pointer-events: none;
+    }
+
+    /* ── icon pulse ── */
+    .err-icon-wrap {
+        position: relative;
+        width: 80px;
+        height: 80px;
+        margin: 0 auto 1.75rem;
+    }
+    .err-icon-ring {
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        border: 3px solid currentColor;
+        opacity: 0;
+        animation: err-ring 2.4s ease-out infinite;
+    }
+    .err-icon-ring:nth-child(2) { animation-delay: .8s; }
+    .err-icon-ring:nth-child(3) { animation-delay: 1.6s; }
+    @keyframes err-ring {
+        0%   { transform: scale(.6); opacity: .5; }
+        100% { transform: scale(1.75); opacity: 0; }
+    }
+    .err-icon-core {
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2.2rem;
+    }
+
+    /* per-code colour themes */
+    .err-theme-404 { color: #3b82f6; }
+    .err-theme-404 .err-icon-core { background: rgba(59,130,246,.1); color: #3b82f6; }
+    .err-theme-500 { color: #ef4444; }
+    .err-theme-500 .err-icon-core { background: rgba(239,68,68,.1); color: #ef4444; }
+    .err-theme-403 { color: #f59e0b; }
+    .err-theme-403 .err-icon-core { background: rgba(245,158,11,.1); color: #f59e0b; }
+    .err-theme-429 { color: #8b5cf6; }
+    .err-theme-429 .err-icon-core { background: rgba(139,92,246,.1); color: #8b5cf6; }
+    .err-theme-generic { color: #64748b; }
+    .err-theme-generic .err-icon-core { background: #f1f5f9; color: #64748b; }
+
+    /* ── copy of err-code gradient per theme ── */
+    .err-theme-404 .err-code {
+        background: linear-gradient(135deg, #3b82f6, #818cf8);
+        -webkit-background-clip: text; background-clip: text;
+    }
+    .err-theme-500 .err-code {
+        background: linear-gradient(135deg, #ef4444, #f97316);
+        -webkit-background-clip: text; background-clip: text;
+    }
+    .err-theme-403 .err-code {
+        background: linear-gradient(135deg, #f59e0b, #ef4444);
+        -webkit-background-clip: text; background-clip: text;
+    }
+    .err-theme-429 .err-code {
+        background: linear-gradient(135deg, #8b5cf6, #3b82f6);
+        -webkit-background-clip: text; background-clip: text;
+    }
+
+    /* ── text ── */
+    .err-title {
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: var(--dark-color);
+        margin-bottom: .4rem;
+    }
+    .err-desc {
+        font-size: .95rem;
+        color: #64748b;
+        max-width: 440px;
+        line-height: 1.65;
+        margin-bottom: 2rem;
+    }
+
+    /* ── detail box ── */
+    .err-detail-box {
+        background: white;
+        border-radius: 10px;
+        box-shadow: var(--box-shadow);
+        padding: 1rem 1.5rem;
+        margin-bottom: 2rem;
+        font-size: .82rem;
+        color: #475569;
+        max-width: 480px;
+        width: 100%;
+        text-align: left;
+    }
+    .err-detail-box strong { color: var(--dark-color); }
+    .err-detail-label {
+        font-size: .7rem;
+        font-weight: 700;
+        letter-spacing: .07em;
+        text-transform: uppercase;
+        color: #94a3b8;
+        margin-bottom: .4rem;
+    }
+    .err-mono {
+        font-family: 'Courier New', monospace;
+        font-size: .78rem;
+        background: #f8fafc;
+        padding: .3rem .6rem;
+        border-radius: 5px;
+        color: var(--primary-color);
+        word-break: break-all;
+    }
+
+    /* ── action buttons ── */
+    .err-actions {
+        display: flex;
+        gap: .75rem;
+        flex-wrap: wrap;
+        justify-content: center;
+        margin-bottom: 2rem;
+    }
+    .err-btn-primary {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        background: var(--primary-color);
+        color: white;
+        border: none;
+        padding: .65rem 1.5rem;
+        border-radius: var(--border-radius);
+        font-weight: 600;
+        font-size: .9rem;
+        text-decoration: none;
+        transition: var(--transition);
+        box-shadow: var(--box-shadow);
+    }
+    .err-btn-primary:hover {
+        background: var(--secondary-color);
+        color: white;
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(67,97,238,.25);
+    }
+    .err-btn-sec {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        background: white;
+        color: #475569;
+        border: 1.5px solid #e2e8f0;
+        padding: .62rem 1.4rem;
+        border-radius: var(--border-radius);
+        font-weight: 600;
+        font-size: .9rem;
+        text-decoration: none;
+        transition: var(--transition);
+    }
+    .err-btn-sec:hover {
+        border-color: var(--primary-color);
+        color: var(--primary-color);
+        background: var(--primary-light);
+    }
+
+    /* ── helpful links ── */
+    .err-links {
+        display: flex;
+        gap: 1.5rem;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    .err-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: .82rem;
+        color: #94a3b8;
+        text-decoration: none;
+        transition: color .15s;
+    }
+    .err-link:hover { color: var(--primary-color); }
+
+    /* ── floating particles (pure CSS, subtle) ── */
+    .err-particles {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 0;
+        overflow: hidden;
+    }
+    .err-dot {
+        position: absolute;
+        border-radius: 50%;
+        background: var(--primary-color);
+        opacity: .04;
+        animation: err-float linear infinite;
+    }
+    @keyframes err-float {
+        0%   { transform: translateY(100vh) scale(0); opacity: .06; }
+        100% { transform: translateY(-10vh) scale(1); opacity: 0; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# ── derive theme from code ── #}
+{% set code = error_code|default(0)|int %}
+{% if code == 404 %}
+    {% set theme = '404' %}
+    {% set icon  = 'bi-search' %}
+    {% set title = 'Page Not Found' %}
+    {% set desc  = 'The scan, result, or page you\'re looking for doesn\'t exist — it may have been removed, expired, or the URL is wrong.' %}
+{% elif code == 500 %}
+    {% set theme = '500' %}
+    {% set icon  = 'bi-exclamation-octagon-fill' %}
+    {% set title = 'Internal Server Error' %}
+    {% set desc  = 'Something went wrong on the server. This is not your fault — try again in a moment or start a fresh scan.' %}
+{% elif code == 403 %}
+    {% set theme = '403' %}
+    {% set icon  = 'bi-shield-lock-fill' %}
+    {% set title = 'Access Denied' %}
+    {% set desc  = 'You don\'t have permission to access this resource.' %}
+{% elif code == 429 %}
+    {% set theme = '429' %}
+    {% set icon  = 'bi-hourglass-split' %}
+    {% set title = 'Too Many Requests' %}
+    {% set desc  = 'The scan engine is currently busy. Wait a moment, then try again.' %}
+{% else %}
+    {% set theme = 'generic' %}
+    {% set icon  = 'bi-bug-fill' %}
+    {% set title = 'Something Went Wrong' %}
+    {% set desc  = 'An unexpected error occurred. Try going back or starting a new scan.' %}
+{% endif %}
+
+{# floating particles #}
+<div class="err-particles" aria-hidden="true">
+    {% for i in range(10) %}
+    <div class="err-dot" style="
+        left: {{ (loop.index * 97 + 13) % 100 }}%;
+        width:  {{ (loop.index * 11 + 6) % 20 + 8 }}px;
+        height: {{ (loop.index * 11 + 6) % 20 + 8 }}px;
+        animation-duration: {{ (loop.index * 3 + 8) % 10 + 10 }}s;
+        animation-delay:    -{{ (loop.index * 4) % 12 }}s;
+    "></div>
+    {% endfor %}
+</div>
+
+<div class="err-wrap err-theme-{{ theme }}" style="position:relative;z-index:1;">
+
+    {# icon pulse #}
+    <div class="err-icon-wrap">
+        <div class="err-icon-ring"></div>
+        <div class="err-icon-ring"></div>
+        <div class="err-icon-ring"></div>
+        <div class="err-icon-core"><i class="bi {{ icon }}"></i></div>
+    </div>
+
+    {# code #}
+    {% if code %}
+    <div class="err-code-wrap">
+        <div class="err-code-shadow" aria-hidden="true">{{ code }}</div>
+        <div class="err-code">{{ code }}</div>
+    </div>
+    {% endif %}
+
+    <h1 class="err-title">{{ title }}</h1>
+    <p class="err-desc">{{ error_message|default(desc) }}</p>
+
+    {# detail box — only when extra context is passed #}
+    {% if scan_id or request_path %}
+    <div class="err-detail-box">
+        {% if scan_id %}
+        <div class="err-detail-label">Scan ID</div>
+        <div class="err-mono" style="margin-bottom:.75rem;">{{ scan_id }}</div>
+        {% endif %}
+        {% if request_path %}
+        <div class="err-detail-label">Requested Path</div>
+        <div class="err-mono">{{ request_path }}</div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {# actions #}
+    <div class="err-actions">
+        <a href="/" class="err-btn-primary">
+            <i class="bi bi-search"></i>New Scan
+        </a>
+        <button onclick="history.back()" class="err-btn-sec">
+            <i class="bi bi-arrow-left"></i>Go Back
+        </button>
+        {% if code == 500 or code == 429 %}
+        <button onclick="location.reload()" class="err-btn-sec">
+            <i class="bi bi-arrow-clockwise"></i>Retry
+        </button>
+        {% endif %}
+    </div>
+
+    {# helpful links #}
+    <div class="err-links">
+        <a href="/" class="err-link"><i class="bi bi-house"></i>Home</a>
+        <a href="/history" class="err-link"><i class="bi bi-clock-history"></i>Scan History</a>
+        <a href="/about" class="err-link"><i class="bi bi-info-circle"></i>About</a>
+        <a href="/health" class="err-link" target="_blank"><i class="bi bi-heart-pulse"></i>Health Check</a>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+/* register Flask error handlers in app.py:
+   @app.errorhandler(404)
+   def not_found(e):
+       return render_template('error.html', error_code=404), 404
+
+   @app.errorhandler(500)
+   def server_error(e):
+       return render_template('error.html', error_code=500), 500
+
+   @app.errorhandler(403)
+   def forbidden(e):
+       return render_template('error.html', error_code=403), 403
+
+   @app.errorhandler(429)
+   def too_many(e):
+       return render_template('error.html', error_code=429, error_message=str(e)), 429
+*/
+</script>
+{% endblock %}
