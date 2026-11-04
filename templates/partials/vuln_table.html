@@ -1,0 +1,654 @@
+{% macro vuln_table(results) %}
+<div class="vuln-table-root">
+
+    {# ── styles scoped to this component ── #}
+    <style>
+        .vt-wrap {
+            background: white;
+            border-radius: 12px;
+            box-shadow: var(--box-shadow);
+            overflow: hidden;
+            margin-bottom: 1.5rem;
+        }
+
+        /* ── toolbar ── */
+        .vt-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: .75rem;
+            padding: 1rem 1.25rem;
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .vt-title {
+            font-size: .95rem;
+            font-weight: 700;
+            color: var(--dark-color);
+            display: flex;
+            align-items: center;
+            gap: 7px;
+        }
+        .vt-title i { color: var(--danger-color); }
+        .vt-controls {
+            display: flex;
+            gap: .5rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .vt-search {
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: .35rem .8rem;
+            font-size: .82rem;
+            outline: none;
+            transition: border-color .2s;
+            min-width: 180px;
+        }
+        .vt-search:focus { border-color: var(--primary-color); }
+        .vt-filter-btn {
+            padding: .3rem .75rem;
+            border-radius: 20px;
+            border: 1.5px solid #e2e8f0;
+            background: white;
+            font-size: .75rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all .15s ease;
+            white-space: nowrap;
+        }
+        .vt-filter-btn:hover, .vt-filter-btn.vt-active {
+            border-color: currentColor;
+        }
+        .vt-filter-btn[data-sev="all"]      { color: #475569; }
+        .vt-filter-btn[data-sev="critical"] { color: #ef4444; }
+        .vt-filter-btn[data-sev="critical"].vt-active { background:rgba(239,68,68,.08); }
+        .vt-filter-btn[data-sev="high"]     { color: #f59e0b; }
+        .vt-filter-btn[data-sev="high"].vt-active    { background:rgba(245,158,11,.08); }
+        .vt-filter-btn[data-sev="medium"]   { color: #3b82f6; }
+        .vt-filter-btn[data-sev="medium"].vt-active  { background:rgba(59,130,246,.08); }
+        .vt-filter-btn[data-sev="low"]      { color: #10b981; }
+        .vt-filter-btn[data-sev="low"].vt-active     { background:rgba(16,185,129,.08); }
+        .vt-filter-btn[data-sev="all"].vt-active     { background:#f1f5f9; }
+
+        /* ── summary badges ── */
+        .vt-summary {
+            display: flex;
+            gap: .5rem;
+            flex-wrap: wrap;
+            padding: .75rem 1.25rem;
+            background: white;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .vt-scount {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: .2rem .65rem;
+            border-radius: 20px;
+            font-size: .75rem;
+            font-weight: 700;
+        }
+        .vt-scount-critical { background:rgba(239,68,68,.1);  color:#ef4444; }
+        .vt-scount-high     { background:rgba(245,158,11,.1); color:#f59e0b; }
+        .vt-scount-medium   { background:rgba(59,130,246,.1); color:#3b82f6; }
+        .vt-scount-low      { background:rgba(16,185,129,.1); color:#10b981; }
+        .vt-scount-info     { background:#f1f5f9; color:#64748b; }
+
+        /* ── table ── */
+        .vt-table-scroll { overflow-x: auto; }
+        .vt-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: .84rem;
+        }
+        .vt-table thead th {
+            background: var(--primary-light);
+            color: var(--dark-color);
+            font-weight: 650;
+            font-size: .78rem;
+            letter-spacing: .03em;
+            text-transform: uppercase;
+            padding: .85rem 1.1rem;
+            border-bottom: 2px solid rgba(67,97,238,.12);
+            white-space: nowrap;
+        }
+        .vt-table th.sortable { cursor: pointer; user-select: none; }
+        .vt-table th.sortable:hover { background: rgba(67,97,238,.12); }
+        .vt-table th.sortable .sort-icon { margin-left: 4px; opacity: .4; font-size: .7rem; }
+        .vt-table th.sorted-asc  .sort-icon::after { content: '▲'; opacity: 1; }
+        .vt-table th.sorted-desc .sort-icon::after { content: '▼'; opacity: 1; }
+        .vt-table th:not(.sorted-asc):not(.sorted-desc) .sort-icon::after { content: '⇅'; }
+
+        .vt-table tbody tr {
+            border-bottom: 1px solid #f1f5f9;
+            transition: background .12s ease;
+        }
+        .vt-table tbody tr:last-child { border-bottom: none; }
+        .vt-table tbody tr:hover      { background: #fafbff; }
+        .vt-table tbody tr.vt-hidden  { display: none; }
+
+        .vt-table td { padding: .9rem 1.1rem; vertical-align: middle; }
+
+        /* ── severity badges ── */
+        .sev-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: .22rem .7rem;
+            border-radius: 20px;
+            font-size: .72rem;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+        .sev-badge::before {
+            content: '';
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+        .sev-critical { background:rgba(239,68,68,.1);  color:#ef4444; }
+        .sev-high     { background:rgba(245,158,11,.1); color:#f59e0b; }
+        .sev-medium   { background:rgba(59,130,246,.1); color:#3b82f6; }
+        .sev-low      { background:rgba(16,185,129,.1); color:#10b981; }
+        .sev-info     { background:#f1f5f9; color:#64748b; }
+
+        /* ── host / port cell ── */
+        .host-cell { font-weight: 600; color: var(--dark-color); word-break: break-all; }
+        .host-cell small { font-weight: 400; color: #94a3b8; display: block; font-size: .73rem; }
+
+        .port-mono {
+            font-family: 'Courier New', monospace;
+            font-size: .8rem;
+            background: var(--primary-light);
+            color: var(--primary-color);
+            padding: .15rem .5rem;
+            border-radius: 5px;
+            font-weight: 600;
+        }
+
+        /* ── CVE tag ── */
+        .cve-tag {
+            display: inline-block;
+            font-size: .68rem;
+            font-family: monospace;
+            background: rgba(239,68,68,.07);
+            color: #ef4444;
+            border: 1px solid rgba(239,68,68,.2);
+            padding: .1rem .45rem;
+            border-radius: 5px;
+            margin: .1rem .15rem .1rem 0;
+            white-space: nowrap;
+        }
+
+        /* ── expand row ── */
+        .vt-expand-btn {
+            background: none;
+            border: none;
+            color: var(--primary-color);
+            cursor: pointer;
+            padding: 0;
+            font-size: .8rem;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-weight: 600;
+            transition: color .15s;
+        }
+        .vt-expand-btn:hover { color: var(--secondary-color); }
+
+        .vt-detail-row td {
+            padding: 0 !important;
+            background: #fafbff;
+        }
+        .vt-detail-inner {
+            padding: 1rem 1.25rem;
+            border-top: 1px dashed #e2e8f0;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: .82rem;
+            color: #475569;
+            line-height: 1.65;
+        }
+        .vt-detail-inner strong { color: var(--dark-color); }
+
+        /* ── ssl vuln sub-table ── */
+        .ssl-sub-table { width: 100%; border-collapse: collapse; margin-top: .5rem; }
+        .ssl-sub-table td {
+            padding: .3rem .5rem;
+            font-size: .78rem;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .ssl-sub-table tr:last-child td { border-bottom: none; }
+
+        /* ── empty ── */
+        .vt-empty {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: #94a3b8;
+        }
+        .vt-empty i { font-size: 2.5rem; display: block; margin-bottom: .75rem; color: #cbd5e1; }
+
+        /* ── pagination ── */
+        .vt-pager {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: .5rem;
+            padding: .85rem 1.25rem;
+            background: #f8fafc;
+            border-top: 1px solid #e2e8f0;
+            font-size: .82rem;
+            color: #64748b;
+        }
+        .vt-page-btns { display: flex; gap: .35rem; }
+        .vt-page-btn {
+            padding: .3rem .7rem;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+            background: white;
+            font-size: .78rem;
+            cursor: pointer;
+            transition: all .15s;
+        }
+        .vt-page-btn:hover, .vt-page-btn.vt-page-active {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+        .vt-page-btn:disabled {
+            opacity: .4;
+            cursor: default;
+        }
+    </style>
+
+    {# ─── build vuln rows from every available source ─── #}
+    {# Source 1: port-based vulnerabilities (port.risk.vulnerabilities) #}
+    {# Source 2: SSL vulnerabilities (ssl_data.vulnerabilities)         #}
+    {# Source 3: takeover_analysis targets                              #}
+    {# Source 4: AI hunter high_value_findings                         #}
+    {# Source 5: security_analysis risk factors as low-sev rows        #}
+
+    {# Count helpers — Jinja can't easily iterate across sources,      #}
+    {# so JS builds the unified list from /api/results/<scan_id>       #}
+
+    <div class="vt-wrap" id="vulnTableRoot">
+
+        <div class="vt-toolbar">
+            <div class="vt-title">
+                <i class="bi bi-bug-fill"></i>
+                Vulnerability Summary
+                <span class="vt-scount vt-scount-info" id="vtTotalBadge">0 findings</span>
+            </div>
+            <div class="vt-controls">
+                <input class="vt-search" id="vtSearch" type="text" placeholder="Search host, port, finding…">
+                <button class="vt-filter-btn vt-active" data-sev="all"      onclick="vtFilter(this)">All</button>
+                <button class="vt-filter-btn"           data-sev="critical" onclick="vtFilter(this)">Critical</button>
+                <button class="vt-filter-btn"           data-sev="high"     onclick="vtFilter(this)">High</button>
+                <button class="vt-filter-btn"           data-sev="medium"   onclick="vtFilter(this)">Medium</button>
+                <button class="vt-filter-btn"           data-sev="low"      onclick="vtFilter(this)">Low</button>
+            </div>
+        </div>
+
+        <div class="vt-summary" id="vtSummaryBar">
+            <span class="vt-scount vt-scount-critical" id="vtCritCount">0 Critical</span>
+            <span class="vt-scount vt-scount-high"     id="vtHighCount">0 High</span>
+            <span class="vt-scount vt-scount-medium"   id="vtMedCount">0 Medium</span>
+            <span class="vt-scount vt-scount-low"      id="vtLowCount">0 Low</span>
+        </div>
+
+        <div class="vt-table-scroll">
+            <table class="vt-table">
+                <thead>
+                    <tr>
+                        <th class="sortable" data-col="sev">Severity <span class="sort-icon"></span></th>
+                        <th class="sortable" data-col="host">Host / Source <span class="sort-icon"></span></th>
+                        <th>Port / Context</th>
+                        <th class="sortable" data-col="finding">Finding <span class="sort-icon"></span></th>
+                        <th>Detail</th>
+                    </tr>
+                </thead>
+                <tbody id="vtBody">
+                    <tr><td colspan="5" class="vt-empty">
+                        <i class="bi bi-arrow-repeat" style="animation:spin 1s linear infinite;"></i>
+                        Loading findings…
+                    </td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="vt-pager" id="vtPager" style="display:none;">
+            <span id="vtPagerInfo">Showing 0–0 of 0</span>
+            <div class="vt-page-btns" id="vtPageBtns"></div>
+        </div>
+
+    </div>
+
+    <style>
+        @keyframes spin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
+    </style>
+
+    {# ── JS for this component ── #}
+    <script>
+    (function () {
+        const SCAN_ID   = '{{ scan_id }}';
+        const PAGE_SIZE = 15;
+
+        let allRows   = [];   /* [{sev, sevRank, host, port, finding, detail, cves}] */
+        let filtered  = [];
+        let sortCol   = 'sev';
+        let sortDir   = 'desc';
+        let page      = 0;
+        let activeFilter = 'all';
+        let searchQ   = '';
+
+        const SEV_RANK = { critical:4, high:3, medium:2, low:1, info:0 };
+
+        /* ── fetch ── */
+        fetch('/api/results/' + SCAN_ID)
+            .then(r => r.json())
+            .then(build)
+            .catch(() => {
+                document.getElementById('vtBody').innerHTML =
+                    '<tr><td colspan="5" class="vt-empty"><i class="bi bi-exclamation-triangle"></i>Could not load scan data.</td></tr>';
+            });
+
+        function build(d) {
+            const rows = [];
+
+            /* 1. Port vulnerabilities */
+            (d.port_scan || []).forEach(host => {
+                (host.ports || []).forEach(p => {
+                    if (!p.risk) return;
+                    const vuln = p.risk.vulnerabilities || '';
+                    if (!vuln || vuln === 'None' || vuln === 'N/A') return;
+                    const sev = normSev(p.risk.level);
+                    rows.push({
+                        sev, sevRank: SEV_RANK[sev] || 0,
+                        host: host.target,
+                        port: `${p.port}/${p.protocol || 'tcp'}`,
+                        finding: `${p.service || ''} vulnerability`,
+                        detail: vuln,
+                        cves: [],
+                        source: 'port'
+                    });
+                });
+            });
+
+            /* 2. SSL vulnerabilities */
+            Object.entries(d.ssl_scan || {}).forEach(([hostKey, ssl]) => {
+                Object.entries(ssl.vulnerabilities || {}).forEach(([vname, present]) => {
+                    if (!present) return;
+                    const critical = ['heartbleed','drown','poodle'].includes(vname);
+                    const high     = ['beast','freak','logjam'].includes(vname);
+                    const sev = critical ? 'critical' : high ? 'high' : 'medium';
+                    rows.push({
+                        sev, sevRank: SEV_RANK[sev],
+                        host: hostKey,
+                        port: '443/tcp',
+                        finding: vname.toUpperCase() + ' (SSL)',
+                        detail: `SSL vulnerability ${vname} detected on ${hostKey}`,
+                        cves: cvesFor(vname),
+                        source: 'ssl'
+                    });
+                });
+
+                /* Expired cert as a medium */
+                if (ssl.validation && ssl.validation.expired) {
+                    rows.push({
+                        sev: 'medium', sevRank: 2,
+                        host: hostKey,
+                        port: '443/tcp',
+                        finding: 'Expired TLS Certificate',
+                        detail: 'The certificate on this host has expired.',
+                        cves: [],
+                        source: 'ssl'
+                    });
+                }
+            });
+
+            /* 3. Takeover candidates */
+            (d.takeover_analysis && d.takeover_analysis.vulnerable_subdomains || []).forEach(t => {
+                rows.push({
+                    sev: 'high', sevRank: 3,
+                    host: t.subdomain || t,
+                    port: '—',
+                    finding: 'Subdomain Takeover Risk',
+                    detail: t.reason || 'Subdomain may be vulnerable to takeover.',
+                    cves: [],
+                    source: 'takeover'
+                });
+            });
+
+            /* 4. AI hunter high-value findings */
+            const hf = d.ai_analysis && d.ai_analysis.hunter_analysis
+                        ? d.ai_analysis.hunter_analysis.high_value_findings || []
+                        : [];
+            hf.forEach(f => {
+                rows.push({
+                    sev: 'high', sevRank: 3,
+                    host: d.domain,
+                    port: '—',
+                    finding: f,
+                    detail: 'Identified by AI hunter analysis.',
+                    cves: [],
+                    source: 'ai'
+                });
+            });
+
+            /* 5. Risk factors as low / info rows */
+            const factors = d.security_analysis && d.security_analysis.risk_assessment
+                            ? d.security_analysis.risk_assessment.factors || []
+                            : [];
+            factors.forEach(f => {
+                rows.push({
+                    sev: 'low', sevRank: 1,
+                    host: d.domain,
+                    port: '—',
+                    finding: f,
+                    detail: 'From automated security analysis.',
+                    cves: [],
+                    source: 'analysis'
+                });
+            });
+
+            allRows = rows;
+            updateCounts();
+            applyFilter();
+        }
+
+        /* ── CVE map for known SSL vulns ── */
+        function cvesFor(v) {
+            const m = {
+                heartbleed: ['CVE-2014-0160'],
+                poodle:     ['CVE-2014-3566'],
+                drown:      ['CVE-2016-0800'],
+                beast:      ['CVE-2011-3389'],
+                freak:      ['CVE-2015-0204'],
+                logjam:     ['CVE-2015-4000'],
+            };
+            return m[v] || [];
+        }
+
+        function normSev(s) {
+            if (!s) return 'info';
+            const l = s.toLowerCase();
+            if (l === 'critical') return 'critical';
+            if (l === 'high')     return 'high';
+            if (l === 'medium')   return 'medium';
+            if (l === 'low')      return 'low';
+            return 'info';
+        }
+
+        /* ── counts ── */
+        function updateCounts() {
+            const cnt = {critical:0, high:0, medium:0, low:0};
+            allRows.forEach(r => { if (cnt[r.sev] !== undefined) cnt[r.sev]++; });
+            document.getElementById('vtCritCount').textContent = cnt.critical + ' Critical';
+            document.getElementById('vtHighCount').textContent = cnt.high     + ' High';
+            document.getElementById('vtMedCount').textContent  = cnt.medium   + ' Medium';
+            document.getElementById('vtLowCount').textContent  = cnt.low      + ' Low';
+            document.getElementById('vtTotalBadge').textContent = allRows.length + ' findings';
+        }
+
+        /* ── filter + search ── */
+        window.vtFilter = function (btn) {
+            document.querySelectorAll('.vt-filter-btn').forEach(b => b.classList.remove('vt-active'));
+            btn.classList.add('vt-active');
+            activeFilter = btn.dataset.sev;
+            page = 0;
+            applyFilter();
+        };
+
+        document.getElementById('vtSearch').addEventListener('input', function () {
+            searchQ = this.value.toLowerCase();
+            page = 0;
+            applyFilter();
+        });
+
+        function applyFilter() {
+            filtered = allRows.filter(r => {
+                const sevOk  = activeFilter === 'all' || r.sev === activeFilter;
+                const haystack = `${r.host} ${r.port} ${r.finding} ${r.detail}`.toLowerCase();
+                const qOk    = !searchQ || haystack.includes(searchQ);
+                return sevOk && qOk;
+            });
+            sortRows();
+            renderPage();
+        }
+
+        /* ── sort ── */
+        document.querySelectorAll('.vt-table th.sortable').forEach(th => {
+            th.addEventListener('click', function () {
+                const col = this.dataset.col;
+                if (sortCol === col) {
+                    sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+                } else {
+                    sortCol = col; sortDir = 'desc';
+                }
+                document.querySelectorAll('.vt-table th').forEach(t =>
+                    t.classList.remove('sorted-asc','sorted-desc'));
+                this.classList.add(sortDir === 'asc' ? 'sorted-asc' : 'sorted-desc');
+                page = 0;
+                sortRows();
+                renderPage();
+            });
+        });
+
+        function sortRows() {
+            filtered.sort((a, b) => {
+                let va = a[sortCol === 'sev' ? 'sevRank' : sortCol] || '';
+                let vb = b[sortCol === 'sev' ? 'sevRank' : sortCol] || '';
+                if (typeof va === 'string') va = va.toLowerCase();
+                if (typeof vb === 'string') vb = vb.toLowerCase();
+                if (va < vb) return sortDir === 'asc' ? -1 : 1;
+                if (va > vb) return sortDir === 'asc' ?  1 : -1;
+                return 0;
+            });
+        }
+
+        /* ── render ── */
+        function renderPage() {
+            const tbody  = document.getElementById('vtBody');
+            const pager  = document.getElementById('vtPager');
+            const total  = filtered.length;
+
+            if (total === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="vt-empty">
+                    <i class="bi bi-check-circle" style="color:var(--success-color);"></i>
+                    No findings match the current filter.
+                </td></tr>`;
+                pager.style.display = 'none';
+                return;
+            }
+
+            const start = page * PAGE_SIZE;
+            const end   = Math.min(start + PAGE_SIZE, total);
+            const slice = filtered.slice(start, end);
+
+            tbody.innerHTML = slice.map((r, i) => rowHTML(r, start + i)).join('');
+
+            /* pager */
+            const pages = Math.ceil(total / PAGE_SIZE);
+            if (pages <= 1) {
+                pager.style.display = 'none';
+            } else {
+                pager.style.display = 'flex';
+                document.getElementById('vtPagerInfo').textContent =
+                    `Showing ${start + 1}–${end} of ${total}`;
+
+                let btns = `<button class="vt-page-btn" onclick="vtPage(${page-1})" ${page===0?'disabled':''}>‹</button>`;
+                for (let p2 = 0; p2 < pages; p2++) {
+                    btns += `<button class="vt-page-btn ${p2===page?'vt-page-active':''}" onclick="vtPage(${p2})">${p2+1}</button>`;
+                }
+                btns += `<button class="vt-page-btn" onclick="vtPage(${page+1})" ${page===pages-1?'disabled':''}>›</button>`;
+                document.getElementById('vtPageBtns').innerHTML = btns;
+            }
+        }
+
+        window.vtPage = function (p2) {
+            page = p2;
+            renderPage();
+        };
+
+        function rowHTML(r, idx) {
+            const cveHtml = r.cves.length
+                ? r.cves.map(c => `<span class="cve-tag">${c}</span>`).join('')
+                : '';
+            const detailId = `vt-detail-${idx}`;
+            return `
+            <tr class="vt-data-row" data-sev="${r.sev}">
+                <td><span class="sev-badge sev-${r.sev}">${r.sev.charAt(0).toUpperCase()+r.sev.slice(1)}</span></td>
+                <td>
+                    <div class="host-cell">
+                        ${esc(r.host)}
+                        <small>${srcLabel(r.source)}</small>
+                    </div>
+                </td>
+                <td><span class="port-mono">${esc(r.port)}</span></td>
+                <td>
+                    ${esc(r.finding)}
+                    ${cveHtml ? `<div style="margin-top:.3rem;">${cveHtml}</div>` : ''}
+                </td>
+                <td>
+                    <button class="vt-expand-btn" onclick="vtToggleDetail('${detailId}', this)">
+                        <i class="bi bi-chevron-down"></i> Detail
+                    </button>
+                </td>
+            </tr>
+            <tr class="vt-detail-row" id="${detailId}" style="display:none;">
+                <td colspan="5">
+                    <div class="vt-detail-inner">
+                        <strong>Finding:</strong> ${esc(r.finding)}<br>
+                        <strong>Detail:</strong> ${esc(r.detail)}<br>
+                        ${r.cves.length ? `<strong>CVEs:</strong> ${r.cves.map(c=>`<span class="cve-tag">${c}</span>`).join('')}<br>` : ''}
+                        <strong>Source:</strong> ${srcLabel(r.source)}
+                    </div>
+                </td>
+            </tr>`;
+        }
+
+        window.vtToggleDetail = function (id, btn) {
+            const row = document.getElementById(id);
+            const vis = row.style.display !== 'none';
+            row.style.display = vis ? 'none' : '';
+            btn.innerHTML = vis
+                ? '<i class="bi bi-chevron-down"></i> Detail'
+                : '<i class="bi bi-chevron-up"></i> Hide';
+        };
+
+        function srcLabel(s) {
+            const m = { port:'Port Scan', ssl:'SSL Scan', takeover:'Takeover Analysis', ai:'AI Analysis', analysis:'Security Analysis' };
+            return m[s] || s;
+        }
+
+        function esc(str) {
+            return String(str||'')
+                .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
+    })();
+    </script>
+
+{% endmacro %}
