@@ -22,8 +22,11 @@ from modules.AI_vuln_prioritizer import AIVulnPrioritizer
 from modules.AI_attack_path_planner import AIAttackPathPlanner
 from utils.reporting import ReportGenerator
 from utils.helpers import validate_domain, sanitize_domain
-from utils.header_injector import HeaderInjector
-from utils.waf_fingerprinter import WAFFingerprinter
+from utils.header_injector import run_header_injection
+from utils.waf_fingerprinter import run_waf_fingerprint
+from utils.js_secret_extractor import run_js_secret_extraction
+from utils.credential_sprayer import run_credential_spray
+from utils.cors_auditor import run_cors_audit
 from modules.AI_osint_correlator import AIOSINTCorrelator
 from modules.AI_payload_generator import AIPayloadGenerator
 from core.exploit_chain import ExploitChain
@@ -66,6 +69,11 @@ def start_scan():
         'port_scan_choice': 'all_subdomains', # New option for port scan
         'dns': True,
         'ssl': True,
+        'header_injection': True,
+        'waf_fingerprint': True,
+        'js_secret': True,
+        'credential_spray': True,
+        'cors_audit': True,
         'tech': True,
         'email': True,
         'security': True,
@@ -96,6 +104,11 @@ def start_scan():
         'port_scan': [],
         'dns_records': {},
         'ssl_scan': {},
+        'header_injection': {},
+        'waf_fingerprint': {},
+        'js_secrets': {},
+        'credential_spray': {},
+        'cors_audit': {},
         'tech_detection': {},
         'email_enumeration': {},
         'security_analysis': {},
@@ -318,6 +331,48 @@ def run_scan(scan_id, domain, options):
                 domain=domain,
                 scan_results=scan_results[scan_id],
             )
+            
+            target_base_url = f"https://{domain}"
+            
+            if options.get('waf_fingerprint'):
+                scan_status[scan_id]['current_task'] = 'WAF Fingerprinting...'
+                try:
+                    scan_results[scan_id]['waf_fingerprint'] = run_waf_fingerprint(target_base_url)
+                except Exception as e:
+                    scan_results[scan_id]['waf_fingerprint'] = {'error': str(e)}
+                    
+            if opions.get('header_injection'):
+                scan_status[scan_id]['current_task'] = 'Header Injection Probing...'
+                try:
+                    scan_results[scan_id]['header_injection'] = run_header_injection(target_base_url)
+                except Exception as e:
+                    scan_results[scan_id]['header_injection'] = {'error': str(e)}
+                    
+            if options.get('cors_audit'):
+                scan_status[scan_id]['current_task'] = 'CORS Auditing...'
+                try:
+                    scan_results[scan_id]['cors_audit'] = run_cors_audit(target_base_url)
+                except Exception as e:
+                    scan_results[scan_id]['cors_audit'] = {'error': str(e)}
+                    
+            if options.get('js_secrets'):
+                scan_status[scan_id]['current_task'] = 'JS Secret Extraction...'
+                try:
+                    scan_results[scan_id]['js_secrets'] = run_js_secret_extraction(target_base_url)
+                except Exception as e:
+                    scan_results[scan_id]['js_secrets'] = {'error': str(e)}
+                    
+            if options.get('credential_spray'):
+                scan_status[scan_id]['current_task'] = 'Credential Spraying...'
+                try:
+                    login_url = options.get('credential_spray_url', target_base_url + '/login')
+                    scan_results[scan_id]['credential_spray'] = run_credential_spray(
+                        login_url,
+                        delay=options.get('spray_delay', 2.0),
+                        stop_on_success=True,
+                    )
+                except Exception as e:
+                    scan_results[scan_id]['credential_spray'] = {'error': str(e)}
             
             # Run security analysis
             scan_status[scan_id]['current_task'] = 'Running security analysis...'
