@@ -33,6 +33,7 @@ from core.exploit_chain import ExploitChain
 from core.auth_bypass import AuthBypass
 from core.cve_matcher import CveMatcher
 from core.session_hijack import SessionHijack
+from core.xxe_injector import XxeInjector
 import os
 
 app = Flask(__name__)
@@ -305,6 +306,12 @@ def run_scan(scan_id, domain, options):
                     scan_results=scan_results[scan_id],
                 )
                 scan_status[scan_id]['progress'] = 88
+                
+                xi = XxeInjector()
+                scan_results[scan_id]['xxe_injection'] = xi.run(
+                    domain=domain,
+                    scan_results=scan_results[scan_id],
+                )
                 
                 ab = AuthBypass()
                 scan_results[scan_id]['auth_bypass'] = ab.run(
