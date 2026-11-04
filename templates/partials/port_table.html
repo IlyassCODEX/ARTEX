@@ -1,0 +1,480 @@
+{% macro port_panel(port_scan, scan_id='') %}
+{% if port_scan %}
+
+<style>
+    /* ── toolbar ── */
+    .pp-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: .75rem;
+        margin-bottom: 1.25rem;
+    }
+    .pp-search {
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: .4rem .9rem;
+        font-size: .83rem;
+        outline: none;
+        min-width: 220px;
+        transition: border-color .2s;
+    }
+    .pp-search:focus { border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(67,97,238,.12); }
+
+    .pp-filter-row {
+        display: flex;
+        gap: .4rem;
+        flex-wrap: wrap;
+    }
+    .pp-fbtn {
+        padding: .28rem .75rem;
+        border-radius: 20px;
+        border: 1.5px solid #e2e8f0;
+        background: white;
+        font-size: .74rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all .15s;
+        white-space: nowrap;
+    }
+    .pp-fbtn:hover, .pp-fbtn.pp-active { border-color: currentColor; }
+    .pp-fbtn[data-risk="all"]      { color: #475569; }
+    .pp-fbtn[data-risk="all"].pp-active      { background: #f1f5f9; }
+    .pp-fbtn[data-risk="critical"] { color: #ef4444; }
+    .pp-fbtn[data-risk="critical"].pp-active { background: rgba(239,68,68,.08); }
+    .pp-fbtn[data-risk="high"]     { color: #f59e0b; }
+    .pp-fbtn[data-risk="high"].pp-active     { background: rgba(245,158,11,.08); }
+    .pp-fbtn[data-risk="medium"]   { color: #3b82f6; }
+    .pp-fbtn[data-risk="medium"].pp-active   { background: rgba(59,130,246,.08); }
+    .pp-fbtn[data-risk="low"]      { color: #10b981; }
+    .pp-fbtn[data-risk="low"].pp-active      { background: rgba(16,185,129,.08); }
+
+    /* ── summary strip ── */
+    .pp-summary {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .6rem;
+        margin-bottom: 1.25rem;
+    }
+    .pp-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: .25rem .75rem;
+        border-radius: 20px;
+        font-size: .76rem;
+        font-weight: 700;
+        background: white;
+        box-shadow: var(--box-shadow);
+    }
+    .pp-chip i { font-size: .8rem; }
+
+    /* ── host accordion ── */
+    .pp-host-card {
+        background: white;
+        border-radius: 10px;
+        box-shadow: var(--box-shadow);
+        margin-bottom: .85rem;
+        overflow: hidden;
+        transition: var(--transition);
+    }
+    .pp-host-card.pp-hidden { display: none; }
+    .pp-host-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: .5rem;
+        padding: 1rem 1.25rem;
+        cursor: pointer;
+        user-select: none;
+        background: #f8fafc;
+        border-bottom: 1px solid transparent;
+        transition: background .15s;
+    }
+    .pp-host-header:hover { background: #f1f5f9; }
+    .pp-host-header.pp-open { border-bottom-color: #e2e8f0; background: #f1f5f9; }
+
+    .pp-host-left { display: flex; align-items: center; gap: .65rem; flex-wrap: wrap; }
+    .pp-host-name {
+        font-weight: 700;
+        font-size: .92rem;
+        color: var(--dark-color);
+        font-family: 'Courier New', monospace;
+        word-break: break-all;
+    }
+    .pp-host-right { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
+
+    .pp-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: .18rem .6rem;
+        border-radius: 14px;
+        font-size: .72rem;
+        font-weight: 700;
+    }
+    .pp-badge-primary  { background: var(--primary-light); color: var(--primary-color); }
+    .pp-badge-danger   { background: rgba(239,68,68,.1);  color: #ef4444; }
+    .pp-badge-warning  { background: rgba(245,158,11,.1); color: #f59e0b; }
+    .pp-badge-success  { background: rgba(16,185,129,.1); color: #10b981; }
+
+    .pp-toggle-icon {
+        color: #94a3b8;
+        font-size: .9rem;
+        transition: transform .2s ease;
+        flex-shrink: 0;
+    }
+    .pp-host-header.pp-open .pp-toggle-icon { transform: rotate(180deg); }
+
+    /* ── port table inside host ── */
+    .pp-host-body { display: none; overflow-x: auto; }
+    .pp-host-body.pp-open { display: block; }
+
+    .pp-port-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: .83rem;
+    }
+    .pp-port-table thead th {
+        background: var(--primary-light);
+        color: var(--dark-color);
+        font-weight: 650;
+        font-size: .75rem;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+        padding: .7rem 1.1rem;
+        border-bottom: 2px solid rgba(67,97,238,.12);
+        white-space: nowrap;
+    }
+    .pp-port-table tbody tr {
+        border-bottom: 1px solid #f1f5f9;
+        transition: background .12s;
+    }
+    .pp-port-table tbody tr:last-child { border-bottom: none; }
+    .pp-port-table tbody tr:hover { background: #fafbff; }
+    .pp-port-table tbody tr.pp-row-hidden { display: none; }
+    .pp-port-table td { padding: .75rem 1.1rem; vertical-align: middle; }
+
+    .pp-port-mono {
+        font-family: 'Courier New', monospace;
+        font-size: .82rem;
+        font-weight: 700;
+        background: var(--primary-light);
+        color: var(--primary-color);
+        padding: .15rem .55rem;
+        border-radius: 6px;
+        white-space: nowrap;
+    }
+
+    .pp-service-name { font-weight: 600; color: var(--dark-color); }
+    .pp-version      { font-size: .78rem; color: #94a3b8; font-family: monospace; }
+
+    /* ── risk badges ── */
+    .pp-risk {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: .2rem .6rem;
+        border-radius: 20px;
+        font-size: .71rem;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+    .pp-risk::before {
+        content: '';
+        width: 5px; height: 5px;
+        border-radius: 50%;
+        background: currentColor;
+    }
+    .pp-risk-critical { background: rgba(239,68,68,.1);  color: #ef4444; }
+    .pp-risk-high     { background: rgba(245,158,11,.1); color: #f59e0b; }
+    .pp-risk-medium   { background: rgba(59,130,246,.1); color: #3b82f6; }
+    .pp-risk-low      { background: rgba(16,185,129,.1); color: #10b981; }
+    .pp-risk-info     { background: #f1f5f9; color: #64748b; }
+
+    .pp-vuln-text {
+        font-size: .78rem;
+        color: #475569;
+        max-width: 280px;
+        line-height: 1.4;
+    }
+    .pp-vuln-none { color: #cbd5e1; font-style: italic; font-size: .76rem; }
+
+    /* ── expand row ── */
+    .pp-expand-btn {
+        background: none;
+        border: none;
+        color: var(--primary-color);
+        cursor: pointer;
+        font-size: .78rem;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 0;
+        transition: color .15s;
+    }
+    .pp-expand-btn:hover { color: var(--secondary-color); }
+    .pp-detail-row td {
+        padding: 0 !important;
+        background: #fafbff;
+    }
+    .pp-detail-inner {
+        padding: .85rem 1.1rem;
+        font-size: .8rem;
+        color: #475569;
+        line-height: 1.65;
+        border-top: 1px dashed #e2e8f0;
+    }
+    .pp-detail-inner strong { color: var(--dark-color); }
+
+    /* ── service icon map ── */
+    .pp-svc-icon { font-size: .9rem; margin-right: 4px; color: var(--primary-color); }
+
+    /* ── no results ── */
+    .pp-empty {
+        text-align: center;
+        padding: 2.5rem;
+        color: #94a3b8;
+    }
+    .pp-empty i { display: block; font-size: 2rem; margin-bottom: .5rem; color: #cbd5e1; }
+</style>
+
+<div class="pp-toolbar">
+    <div class="pp-filter-row">
+        <button class="pp-fbtn pp-active" data-risk="all"      onclick="ppFilter(this)">All Risks</button>
+        <button class="pp-fbtn"           data-risk="critical"  onclick="ppFilter(this)">Critical</button>
+        <button class="pp-fbtn"           data-risk="high"      onclick="ppFilter(this)">High</button>
+        <button class="pp-fbtn"           data-risk="medium"    onclick="ppFilter(this)">Medium</button>
+        <button class="pp-fbtn"           data-risk="low"       onclick="ppFilter(this)">Low</button>
+    </div>
+    <input class="pp-search" id="ppSearch" type="text" placeholder="Search host, port, service…">
+</div>
+
+<div class="pp-summary">
+    {% set ns = namespace(total_ports=0, risky=0, hosts=port_scan|length) %}
+    {% for host in port_scan %}
+        {% set ns.total_ports = ns.total_ports + host.ports|length %}
+        {% set ns.risky = ns.risky + host.risky_ports|length %}
+    {% endfor %}
+    <span class="pp-chip" style="color:var(--primary-color);">
+        <i class="bi bi-pc-display"></i>{{ ns.hosts }} host{{ 's' if ns.hosts != 1 }}
+    </span>
+    <span class="pp-chip" style="color:#475569;">
+        <i class="bi bi-plug"></i>{{ ns.total_ports }} open port{{ 's' if ns.total_ports != 1 }}
+    </span>
+    {% if ns.risky > 0 %}
+    <span class="pp-chip" style="color:#ef4444;">
+        <i class="bi bi-exclamation-triangle-fill"></i>{{ ns.risky }} risky port{{ 's' if ns.risky != 1 }}
+    </span>
+    {% else %}
+    <span class="pp-chip" style="color:#10b981;">
+        <i class="bi bi-shield-check"></i>No risky ports
+    </span>
+    {% endif %}
+</div>
+
+<div id="ppHostList">
+{% for host in port_scan %}
+{% set host_idx = loop.index %}
+{# compute worst risk for this host #}
+{% set risk_levels = host.ports | map(attribute='risk') | map(attribute='level') | list %}
+{% set worst = 'low' %}
+{% for lvl in risk_levels %}
+    {% if lvl == 'critical' %}{% set worst = 'critical' %}
+    {% elif lvl == 'high' and worst != 'critical' %}{% set worst = 'high' %}
+    {% elif lvl == 'medium' and worst not in ['critical','high'] %}{% set worst = 'medium' %}
+    {% endif %}
+{% endfor %}
+
+<div class="pp-host-card" data-host="{{ host.target }}" data-worst="{{ worst }}">
+    <div class="pp-host-header" onclick="ppToggle(this)">
+        <div class="pp-host-left">
+            <i class="bi bi-pc-display" style="color:var(--primary-color);font-size:1.1rem;"></i>
+            <span class="pp-host-name">{{ host.target }}</span>
+            <span class="pp-badge pp-badge-primary">
+                <i class="bi bi-plug"></i>{{ host.ports|length }} port{{ 's' if host.ports|length != 1 }}
+            </span>
+            {% if host.risky_ports|length > 0 %}
+            <span class="pp-badge pp-badge-danger">
+                <i class="bi bi-exclamation-triangle-fill"></i>{{ host.risky_ports|length }} risky
+            </span>
+            {% endif %}
+            <span class="pp-risk pp-risk-{{ worst }}">{{ worst|upper }}</span>
+        </div>
+        <div class="pp-host-right">
+            <i class="bi bi-chevron-down pp-toggle-icon"></i>
+        </div>
+    </div>
+
+    <div class="pp-host-body">
+        <table class="pp-port-table">
+            <thead>
+                <tr>
+                    <th>Port</th>
+                    <th>Service</th>
+                    <th>Version</th>
+                    <th>Risk</th>
+                    <th>Vulnerabilities</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for port in host.ports %}
+            {% set port_detail_id = 'pp-det-' ~ host_idx ~ '-' ~ loop.index %}
+            <tr class="pp-port-row" data-risk="{{ port.risk.level|lower }}"
+                data-searchable="{{ host.target }} {{ port.port }} {{ port.service }} {{ port.version|default('') }} {{ port.risk.vulnerabilities }}">
+                <td><span class="pp-port-mono">{{ port.port }}/{{ port.protocol }}</span></td>
+                <td>
+                    <span class="pp-svc-icon">{{ pp_svc_icon(port.service) }}</span>
+                    <span class="pp-service-name">{{ port.service }}</span>
+                </td>
+                <td>
+                    {% if port.version %}
+                    <span class="pp-version">{{ port.version }}</span>
+                    {% else %}
+                    <span class="pp-vuln-none">—</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <span class="pp-risk pp-risk-{{ port.risk.level|lower }}">
+                        {{ port.risk.level|upper }}
+                    </span>
+                </td>
+                <td>
+                    {% if port.risk.vulnerabilities and port.risk.vulnerabilities not in ['None','N/A',''] %}
+                    <span class="pp-vuln-text">{{ port.risk.vulnerabilities }}</span>
+                    {% else %}
+                    <span class="pp-vuln-none">None</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <button class="pp-expand-btn" onclick="ppExpandRow('{{ port_detail_id }}', this)">
+                        <i class="bi bi-chevron-down"></i>
+                    </button>
+                </td>
+            </tr>
+            <tr class="pp-detail-row" id="{{ port_detail_id }}" style="display:none;">
+                <td colspan="6">
+                    <div class="pp-detail-inner">
+                        <strong>Host:</strong> {{ host.target }}<br>
+                        <strong>Port:</strong> {{ port.port }}/{{ port.protocol }}<br>
+                        <strong>Service:</strong> {{ port.service }}<br>
+                        {% if port.version %}<strong>Version:</strong> {{ port.version }}<br>{% endif %}
+                        <strong>Risk Level:</strong>
+                        <span class="pp-risk pp-risk-{{ port.risk.level|lower }}">{{ port.risk.level|upper }}</span><br>
+                        {% if port.risk.vulnerabilities and port.risk.vulnerabilities not in ['None','N/A',''] %}
+                        <strong>Vulnerabilities:</strong> {{ port.risk.vulnerabilities }}
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endfor %}
+</div>
+
+<div class="pp-empty" id="ppEmpty" style="display:none;">
+    <i class="bi bi-funnel"></i>No hosts match the current filter.
+</div>
+
+{# service icon helper — called inline in Jinja #}
+{%- macro pp_svc_icon(svc) -%}
+{%- set s = svc|lower -%}
+{%- if 'http' in s or 'web' in s -%}<i class="bi bi-globe pp-svc-icon"></i>
+{%- elif 'ssh' in s or 'sftp' in s -%}<i class="bi bi-terminal pp-svc-icon"></i>
+{%- elif 'ftp' in s -%}<i class="bi bi-folder-symlink pp-svc-icon"></i>
+{%- elif 'smtp' in s or 'mail' in s or 'imap' in s or 'pop' in s -%}<i class="bi bi-envelope pp-svc-icon"></i>
+{%- elif 'dns' in s -%}<i class="bi bi-hdd-network pp-svc-icon"></i>
+{%- elif 'rdp' in s or 'vnc' in s or 'remote' in s -%}<i class="bi bi-display pp-svc-icon"></i>
+{%- elif 'mysql' in s or 'postgres' in s or 'mssql' in s or 'oracle' in s or 'mongo' in s or 'redis' in s -%}<i class="bi bi-database pp-svc-icon"></i>
+{%- elif 'smb' in s or 'netbios' in s -%}<i class="bi bi-share pp-svc-icon"></i>
+{%- elif 'telnet' in s -%}<i class="bi bi-terminal-dash pp-svc-icon"></i>
+{%- elif 'ldap' in s -%}<i class="bi bi-diagram-3 pp-svc-icon"></i>
+{%- elif 'snmp' in s -%}<i class="bi bi-router pp-svc-icon"></i>
+{%- else -%}<i class="bi bi-plug pp-svc-icon"></i>
+{%- endif -%}
+{%- endmacro -%}
+
+<script>
+(function () {
+    let activeRisk = 'all';
+
+    /* ── accordion toggle ── */
+    window.ppToggle = function (header) {
+        const card = header.closest('.pp-host-card');
+        const body = card.querySelector('.pp-host-body');
+        const isOpen = header.classList.contains('pp-open');
+        header.classList.toggle('pp-open', !isOpen);
+        body.classList.toggle('pp-open', !isOpen);
+    };
+
+    /* ── port-row expand ── */
+    window.ppExpandRow = function (id, btn) {
+        const row = document.getElementById(id);
+        const vis = row.style.display !== 'none';
+        row.style.display = vis ? 'none' : '';
+        btn.innerHTML = vis
+            ? '<i class="bi bi-chevron-down"></i>'
+            : '<i class="bi bi-chevron-up"></i>';
+    };
+
+    /* ── risk filter ── */
+    window.ppFilter = function (btn) {
+        document.querySelectorAll('.pp-fbtn').forEach(b => b.classList.remove('pp-active'));
+        btn.classList.add('pp-active');
+        activeRisk = btn.dataset.risk;
+        applyFilters();
+    };
+
+    /* ── search ── */
+    document.getElementById('ppSearch').addEventListener('input', function () {
+        applyFilters();
+    });
+
+    function applyFilters() {
+        const q    = document.getElementById('ppSearch').value.toLowerCase();
+        const cards = document.querySelectorAll('.pp-host-card');
+        let anyVisible = false;
+
+        cards.forEach(card => {
+            const host = card.dataset.host.toLowerCase();
+            const worst = card.dataset.worst;
+
+            /* host-level risk filter */
+            const riskOk = activeRisk === 'all' || worst === activeRisk;
+
+            /* per-row search + risk filter inside the card */
+            const rows = card.querySelectorAll('.pp-port-row');
+            let cardHasMatch = false;
+            rows.forEach(row => {
+                const rowRisk = row.dataset.risk;
+                const rowText = row.dataset.searchable.toLowerCase();
+                const rowRiskOk  = activeRisk === 'all' || rowRisk === activeRisk;
+                const rowSearchOk = !q || rowText.includes(q) || host.includes(q);
+                const show = rowRiskOk && rowSearchOk;
+                row.classList.toggle('pp-row-hidden', !show);
+                if (show) cardHasMatch = true;
+            });
+
+            const show = riskOk && cardHasMatch;
+            card.classList.toggle('pp-hidden', !show);
+            if (show) anyVisible = true;
+        });
+
+        document.getElementById('ppEmpty').style.display = anyVisible ? 'none' : '';
+    }
+})();
+</script>
+
+{% else %}
+<div class="alert alert-info alert-modern">
+    <i class="bi bi-info-circle me-2"></i>No port scan data available for this scan.
+</div>
+{% endif %}
+{% endmacro %}
