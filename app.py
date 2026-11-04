@@ -485,6 +485,58 @@ def export_results(scan_id):
             'Content-Type': 'application/json',
             'Content-Disposition': f'attachment; filename=security_report_{scan_id}.json'
         }
+        
+@app.route('/history')
+def history():
+    return render_template('history.html')
+    
+@app.route('/history_data')
+def history_data():
+    scans = []
+    for sid, status in scan_status.items():
+        entry = dict(status)
+        if 'start_time' in entry:
+            entry['start_time'] = entry['start_time'].isoformat()
+        if 'end_time' in entry:
+            entry['end_time'] = entry['end_time'].isoformat()
+        entry['scan_id'] = sid
+        scans.append(entry)
+    scans.sort(key=lambda x: x.get('start_time',''), reverse=True)
+    return jsonify({'scans': scans})
+    
+@app.route('/loading/<scan_id>')
+def loading(scan_id):
+    domain = scan_status.get(scan_id, {}).get('domain', '')
+    return render_template('loading.html', scan_id=scan_id, domain=domain)
+    
+@app.route('/export_ui/<scan_id>')
+def export_ui(scan_id):
+    if scan_id not in scan_results:
+        abort(404)
+    r = scan_results[scan_id]
+    if scan_id in scan_status and 'duration' in scan_status[scan_id]:
+        r['duration'] = scan_status[scan_id]['duration']
+    return render_template('export.html', results=r, scan_id=scan_id)
+    
+@app.route('/about')
+def about():
+    return render_template('about.html')
+    
+@app.errorhandler(404)
+def not_found(e):
+    return render_template('error.html', error_code=404), 404
+    
+@app.errorhandler(500)
+def server_error(e):
+    return render_template('error.html', error_code=500), 500
+
+@app.errorhandler(403)
+def forbidden(e):
+    return render_template('error.html', error_code=403), 403
+
+@app.errorhandler(429)
+def too_many(e):
+    return render_template('error.html', error_code=429, error_message=str(e)), 429
 
 @app.route('/health')
 def health_check():
