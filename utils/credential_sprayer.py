@@ -69,7 +69,18 @@ class SprayReport:
     duration_seconds: float = 0.0
 
 
-DEFAULT_USERNAMES = [
+def _load_wordlist(filepath: str, fallback: list[str]) -> list[str]:
+    if not filepath or not os.path.isfile(filepath):
+        return fallback
+    try:
+        with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+            lines = [l.strip() for l in f if l.strip() and not l.startswith("#")]
+        return lines if lines else fallback
+    except OSError:
+        return fallback
+
+
+DEFAULT_USERNAMES_FALLBACK = [
     "admin", "administrator", "root", "user", "test", "guest", "info",
     "support", "service", "manager", "superuser", "sysadmin", "webmaster",
     "operator", "backup", "deploy", "devops", "api", "app", "system",
@@ -95,6 +106,12 @@ DEFAULT_PASSWORDS = [
     "Summer2025", "Winter2025", "Spring2025",
     "Company1", "Company123", "Company@123",
 ]
+
+USERNAME_FILE = os.getenv("ARTEX_USERNAMES_FILE", "modules/wordlists/usernames.txt")
+PASSWORD_FILE = os.getenv("ARTEX_PASSWORDS_FILE", "modules/wordlists/password/10-million-password-list-top-1000000.txt")
+
+DEFAULT_USERNAMES = _load_wordlist(USERNAMES_FILE, DEFAULT_USERNAMES_FALLBACK)
+DEFAULT_PASSWORDS = _load_wordlist(PASSWORDS_FILE, DEFAULT_PASSWORDS_FALLBACK)
 
 LOCKOUT_STATUS_CODES = {423, 429, 403}
 
@@ -664,6 +681,8 @@ def run_credential_spray(
     target_url: str,
     usernames: Optional[list[str]] = None,
     passwords: Optional[list[str]] = None,
+    username_file: Optional[str] = None,
+    password_file: Optional[str] = None,
     delay: float = 2.0,
     jitter: float = 1.0,
     stop_on_success: bool = False,
@@ -673,6 +692,9 @@ def run_credential_spray(
     extra_fields: Optional[dict] = None,
     include_all_attempts: bool = False,
 ) -> dict:
+    resolved_usernames = usernames or _load_wordlist(usernames_file, DEFAULT_USERNAMES) if usernames_file else DEFAULT_USERNAMES
+    resolved_passwords = passwords or _load_wordlist(passwords_file, DEFAULT_PASSWORDS) if passwords_file else DEFAULT_PASSWORDS
+    
     auth_type_enum = None
     if auth_type:
         try:
@@ -687,8 +709,8 @@ def run_credential_spray(
         max_attempts=max_attempts,
         stop_on_lockout=stop_on_lockout,
         stop_on_success=stop_on_success,
-        custom_usernames=usernames,
-        custom_passwords=passwords,
+        custom_usernames=resolved_usernames,
+        custom_passwords=resolved_passwords,
         auth_type_override=auth_type_enum,
         extra_fields=extra_fields or {},
     )
