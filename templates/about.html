@@ -1,0 +1,605 @@
+{% extends "base.html" %}
+
+{% block title %}About | ARTEX{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ── Hero ── */
+    .about-hero {
+        position: relative;
+        overflow: hidden;
+        background: linear-gradient(135deg, var(--dark-color) 0%, #312e81 60%, var(--secondary-color) 100%);
+        border-radius: 16px;
+        padding: 4rem 2.5rem;
+        margin-bottom: 3rem;
+        color: white;
+    }
+
+    .about-hero::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background:
+            radial-gradient(circle at 15% 50%, rgba(67,97,238,0.35) 0%, transparent 55%),
+            radial-gradient(circle at 85% 20%, rgba(63,55,201,0.3) 0%, transparent 50%);
+        pointer-events: none;
+    }
+
+    .about-hero::after {
+        content: '';
+        position: absolute;
+        right: -60px;
+        top: -60px;
+        width: 320px;
+        height: 320px;
+        border-radius: 50%;
+        border: 48px solid rgba(255,255,255,0.04);
+        pointer-events: none;
+    }
+
+    .hero-shield {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 80px;
+        height: 80px;
+        border-radius: 20px;
+        background: rgba(255,255,255,0.12);
+        backdrop-filter: blur(8px);
+        border: 1px solid rgba(255,255,255,0.18);
+        font-size: 2.4rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    }
+
+    .hero-title {
+        font-size: 2.4rem;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        margin-bottom: 0.5rem;
+    }
+
+    .hero-title span {
+        background: linear-gradient(90deg, #a5b4fc, #818cf8);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .hero-sub {
+        font-size: 1rem;
+        opacity: 0.75;
+        max-width: 480px;
+        line-height: 1.65;
+        margin-bottom: 2rem;
+    }
+
+    .hero-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .hero-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 0.3rem 0.8rem;
+        border-radius: 20px;
+        background: rgba(255,255,255,0.1);
+        border: 1px solid rgba(255,255,255,0.15);
+        font-size: 0.78rem;
+        font-weight: 500;
+        backdrop-filter: blur(6px);
+    }
+
+    /* ── Section label ── */
+    .section-eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--primary-color);
+        background: var(--primary-light);
+        padding: 0.3rem 0.8rem;
+        border-radius: 20px;
+        margin-bottom: 0.75rem;
+    }
+
+    .section-heading {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--dark-color);
+        margin-bottom: 0.4rem;
+    }
+
+    .section-desc {
+        color: #64748b;
+        font-size: 0.92rem;
+        margin-bottom: 1.75rem;
+    }
+
+    /* ── Feature cards ── */
+    .feature-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 1.1rem;
+        margin-bottom: 3rem;
+    }
+
+    .feature-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: var(--box-shadow);
+        padding: 1.5rem;
+        transition: var(--transition);
+        border: 1px solid transparent;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .feature-card::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+        opacity: 0;
+        transition: opacity 0.25s ease;
+    }
+
+    .feature-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 12px 24px -6px rgba(67,97,238,0.15);
+        border-color: rgba(67,97,238,0.12);
+    }
+
+    .feature-card:hover::before { opacity: 1; }
+
+    .feature-icon-wrap {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 46px;
+        height: 46px;
+        border-radius: 12px;
+        font-size: 1.3rem;
+        margin-bottom: 1rem;
+    }
+
+    .feature-title {
+        font-size: 0.95rem;
+        font-weight: 650;
+        color: var(--dark-color);
+        margin-bottom: 0.4rem;
+    }
+
+    .feature-desc {
+        font-size: 0.82rem;
+        color: #64748b;
+        line-height: 1.6;
+        margin-bottom: 0;
+    }
+
+    /* ── Module table ── */
+    .module-table-wrap {
+        background: white;
+        border-radius: 12px;
+        box-shadow: var(--box-shadow);
+        overflow: hidden;
+        margin-bottom: 3rem;
+    }
+
+    .module-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .module-table thead th {
+        background: var(--primary-light);
+        color: var(--dark-color);
+        font-weight: 600;
+        font-size: 0.82rem;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        padding: 0.9rem 1.25rem;
+        border-bottom: 2px solid rgba(67,97,238,0.12);
+    }
+
+    .module-table tbody tr {
+        border-bottom: 1px solid #f1f5f9;
+        transition: background 0.15s ease;
+    }
+
+    .module-table tbody tr:last-child { border-bottom: none; }
+
+    .module-table tbody tr:hover { background: #fafbff; }
+
+    .module-table td {
+        padding: 1rem 1.25rem;
+        font-size: 0.88rem;
+        vertical-align: middle;
+    }
+
+    .module-name {
+        font-family: 'Courier New', monospace;
+        font-size: 0.83rem;
+        font-weight: 600;
+        color: var(--primary-color);
+        background: var(--primary-light);
+        padding: 0.2rem 0.6rem;
+        border-radius: 6px;
+        white-space: nowrap;
+    }
+
+    .module-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        padding: 0.2rem 0.65rem;
+        border-radius: 20px;
+        background: rgba(16,185,129,0.1);
+        color: var(--success-color);
+    }
+
+    .module-status::before {
+        content: '';
+        width: 6px; height: 6px;
+        border-radius: 50%;
+        background: currentColor;
+        animation: blink 2s ease-in-out infinite;
+    }
+
+    @keyframes blink {
+        0%, 100% { opacity: 1; }
+        50%       { opacity: 0.3; }
+    }
+
+    /* ── Tech stack pills ── */
+    .tech-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+        margin-bottom: 3rem;
+    }
+
+    .tech-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 0.45rem 1rem;
+        border-radius: 24px;
+        background: white;
+        box-shadow: var(--box-shadow);
+        font-size: 0.84rem;
+        font-weight: 500;
+        color: #475569;
+        border: 1px solid #e2e8f0;
+        transition: var(--transition);
+    }
+
+    .tech-pill:hover {
+        border-color: var(--primary-color);
+        color: var(--primary-color);
+        background: var(--primary-light);
+    }
+
+    .tech-pill i { color: var(--primary-color); font-size: 0.95rem; }
+
+    /* ── Stat strip ── */
+    .stat-strip {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 1rem;
+        margin-bottom: 3rem;
+    }
+
+    .stat-box {
+        background: white;
+        border-radius: 12px;
+        box-shadow: var(--box-shadow);
+        padding: 1.4rem 1rem;
+        text-align: center;
+        transition: var(--transition);
+        border-bottom: 3px solid transparent;
+    }
+
+    .stat-box:hover {
+        border-bottom-color: var(--primary-color);
+        transform: translateY(-2px);
+    }
+
+    .stat-num {
+        font-size: 2rem;
+        font-weight: 800;
+        color: var(--primary-color);
+        line-height: 1;
+        margin-bottom: 0.3rem;
+    }
+
+    .stat-label {
+        font-size: 0.78rem;
+        color: #94a3b8;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    /* ── CTA ── */
+    .cta-band {
+        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        border-radius: 14px;
+        padding: 2.5rem 2rem;
+        text-align: center;
+        color: white;
+        margin-bottom: 1rem;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .cta-band::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle at 70% 50%, rgba(255,255,255,0.08) 0%, transparent 60%);
+        pointer-events: none;
+    }
+
+    .cta-band h4 {
+        font-size: 1.35rem;
+        font-weight: 700;
+        margin-bottom: 0.4rem;
+    }
+
+    .cta-band p {
+        opacity: 0.8;
+        font-size: 0.9rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .btn-cta {
+        background: white;
+        color: var(--primary-color);
+        border: none;
+        padding: 0.7rem 1.75rem;
+        border-radius: var(--border-radius);
+        font-weight: 650;
+        font-size: 0.92rem;
+        transition: var(--transition);
+        box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+    }
+
+    .btn-cta:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+        color: var(--secondary-color);
+    }
+
+    /* ── Health badge ── */
+    .health-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        background: rgba(16,185,129,0.1);
+        color: var(--success-color);
+        border: 1px solid rgba(16,185,129,0.25);
+        padding: 0.35rem 0.9rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+
+    .health-badge.degraded {
+        background: rgba(245,158,11,0.1);
+        color: var(--warning-color);
+        border-color: rgba(245,158,11,0.25);
+    }
+
+    .health-badge.down {
+        background: rgba(239,68,68,0.1);
+        color: var(--danger-color);
+        border-color: rgba(239,68,68,0.25);
+    }
+
+    .health-dot {
+        width: 7px; height: 7px;
+        border-radius: 50%;
+        background: currentColor;
+        animation: blink 1.8s ease-in-out infinite;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── Hero ── -->
+<div class="about-hero">
+    <div class="hero-shield"><i class="bi bi-shield-lock-fill"></i></div>
+    <div class="hero-title">ART<span>EX</span></div>
+    <p class="hero-sub">Advanced Reconnaissance &amp; Threat Exposure — a full-surface OSINT and security recon platform built for speed, depth, and AI-assisted analysis.</p>
+    <div class="hero-tags">
+        <span class="hero-tag"><i class="bi bi-cpu"></i> AI-Powered</span>
+        <span class="hero-tag"><i class="bi bi-layers"></i> Multi-Module</span>
+        <span class="hero-tag"><i class="bi bi-lightning"></i> Fast</span>
+        <span class="hero-tag"><i class="bi bi-code-slash"></i> Open Surface</span>
+        <span class="hero-tag" id="healthTag"><i class="bi bi-circle-fill" style="font-size:0.5rem;"></i> Checking...</span>
+    </div>
+</div>
+
+<!-- ── Stats ── -->
+<div class="stat-strip" id="statStrip">
+    <div class="stat-box"><div class="stat-num" id="statModules">—</div><div class="stat-label">Modules</div></div>
+    <div class="stat-box"><div class="stat-num" id="statFeatures">—</div><div class="stat-label">Features</div></div>
+    <div class="stat-box"><div class="stat-num">5</div><div class="stat-label">Scan Types</div></div>
+    <div class="stat-box"><div class="stat-num">AI</div><div class="stat-label">Analysis Engine</div></div>
+</div>
+
+<!-- ── Features ── -->
+<div class="section-eyebrow"><i class="bi bi-grid-3x3-gap"></i> What it does</div>
+<div class="section-heading">Core Capabilities</div>
+<p class="section-desc">Each module runs in parallel. Results feed into the AI analysis layer for a unified threat picture.</p>
+
+<div class="feature-grid" id="featureGrid">
+    <!-- populated from /api/capabilities -->
+</div>
+
+<!-- ── Modules ── -->
+<div class="section-eyebrow"><i class="bi bi-box-seam"></i> Under the hood</div>
+<div class="section-heading">Active Modules</div>
+<p class="section-desc">Internal Python modules that do the work. Each is independently addressable.</p>
+
+<div class="module-table-wrap">
+    <table class="module-table">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Module</th>
+                <th>Responsibility</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody id="moduleBody">
+            <tr><td colspan="4" class="text-center text-muted py-4">Loading modules...</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- ── Tech stack ── -->
+<div class="section-eyebrow"><i class="bi bi-stack"></i> Stack</div>
+<div class="section-heading">Built With</div>
+<p class="section-desc">The libraries and runtimes powering every scan.</p>
+
+<div class="tech-row">
+    <span class="tech-pill"><i class="bi bi-filetype-py"></i> Python 3</span>
+    <span class="tech-pill"><i class="bi bi-lightning-charge"></i> Flask</span>
+    <span class="tech-pill"><i class="bi bi-stars"></i> AI / LLM</span>
+    <span class="tech-pill"><i class="bi bi-diagram-3"></i> Threading</span>
+    <span class="tech-pill"><i class="bi bi-hdd-network"></i> DNS Resolver</span>
+    <span class="tech-pill"><i class="bi bi-plug"></i> Socket Scan</span>
+    <span class="tech-pill"><i class="bi bi-shield-check"></i> SSL / TLS</span>
+    <span class="tech-pill"><i class="bi bi-bootstrap"></i> Bootstrap 5</span>
+    <span class="tech-pill"><i class="bi bi-filetype-js"></i> jQuery</span>
+</div>
+
+<!-- ── CTA ── -->
+<div class="cta-band">
+    <h4>Ready to run a scan?</h4>
+    <p>Drop a domain and ARTEX does the rest — subdomains, ports, tech stack, DNS, and AI threat summary.</p>
+    <a href="/" class="btn-cta"><i class="bi bi-search"></i> Start Scanning</a>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function () {
+
+    /* ── feature icon map ── */
+    const FEATURE_ICONS = {
+        'subdomain':   { icon: 'bi-diagram-3',          color: '#4361ee', bg: 'rgba(67,97,238,0.1)' },
+        'port':        { icon: 'bi-plug',                color: '#f59e0b', bg: 'rgba(245,158,11,0.1)' },
+        'technolog':   { icon: 'bi-cpu',                 color: '#8b5cf6', bg: 'rgba(139,92,246,0.1)' },
+        'email':       { icon: 'bi-envelope-at',         color: '#3b82f6', bg: 'rgba(59,130,246,0.1)' },
+        'security':    { icon: 'bi-shield-exclamation',  color: '#ef4444', bg: 'rgba(239,68,68,0.1)'  },
+        'dns':         { icon: 'bi-hdd-network',         color: '#10b981', bg: 'rgba(16,185,129,0.1)' },
+        'ssl':         { icon: 'bi-lock',                color: '#06b6d4', bg: 'rgba(6,182,212,0.1)'  },
+        'ai':          { icon: 'bi-stars',               color: '#f97316', bg: 'rgba(249,115,22,0.1)' },
+        'default':     { icon: 'bi-gear',                color: '#64748b', bg: 'rgba(100,116,139,0.1)' },
+    };
+
+    const MODULE_DESCS = {
+        'SubdomainEnumerator':   'Brute-forces and passively resolves subdomains across multiple data sources.',
+        'PortScanner':           'TCP connect scan across critical and all-active subdomains, service fingerprinting.',
+        'TechnologyDetector':    'HTTP header and response body analysis for frameworks, CMS, CDN, and WAF.',
+        'EmailUserEnumerator':   'Pattern-based email address generation and verification via SMTP probing.',
+        'FastSecurityAnalyst':   'Aggregates module output into a scored risk model, feeds the AI summariser.',
+    };
+
+    function iconFor(label) {
+        const key = Object.keys(FEATURE_ICONS).find(k => label.toLowerCase().includes(k));
+        return FEATURE_ICONS[key] || FEATURE_ICONS['default'];
+    }
+
+    /* ── load capabilities ── */
+    $.get('/api/capabilities')
+        .done(function (data) {
+            /* stats */
+            $('#statModules').text(data.modules ? data.modules.length : '—');
+            $('#statFeatures').text(data.features ? data.features.length : '—');
+
+            /* feature cards */
+            if (data.features && data.features.length) {
+                const cards = data.features.map(function (f) {
+                    const ic = iconFor(f);
+                    return `
+                    <div class="feature-card">
+                        <div class="feature-icon-wrap" style="background:${ic.bg};color:${ic.color};">
+                            <i class="bi ${ic.icon}"></i>
+                        </div>
+                        <div class="feature-title">${f}</div>
+                        <p class="feature-desc">${featureDesc(f)}</p>
+                    </div>`;
+                }).join('');
+                $('#featureGrid').html(cards);
+            }
+
+            /* module table */
+            if (data.modules && data.modules.length) {
+                const rows = data.modules.map(function (m, i) {
+                    const desc = MODULE_DESCS[m] || 'Internal scan module.';
+                    return `<tr>
+                        <td class="text-muted" style="font-size:0.8rem;">${String(i+1).padStart(2,'0')}</td>
+                        <td><span class="module-name">${m}</span></td>
+                        <td style="color:#475569;">${desc}</td>
+                        <td><span class="module-status">Active</span></td>
+                    </tr>`;
+                }).join('');
+                $('#moduleBody').html(rows);
+            }
+        })
+        .fail(function () {
+            $('#featureGrid').html(
+                '<div class="col-12"><div class="alert alert-warning alert-modern">' +
+                '<i class="bi bi-exclamation-triangle me-2"></i>Could not reach <code>/api/capabilities</code>.' +
+                '</div></div>'
+            );
+            $('#moduleBody').html(
+                '<tr><td colspan="4" class="text-center text-danger py-3">Failed to load modules.</td></tr>'
+            );
+        });
+
+    /* ── health check ── */
+    $.get('/health')
+        .done(function (h) {
+            const ok = h.status === 'healthy';
+            $('#healthTag').html(
+                `<i class="bi bi-circle-fill" style="font-size:0.5rem;color:${ok ? '#10b981' : '#ef4444'};"></i> ${ok ? 'Healthy' : 'Degraded'}`
+            );
+        })
+        .fail(function () {
+            $('#healthTag').html('<i class="bi bi-circle-fill" style="font-size:0.5rem;color:#ef4444;"></i> Offline');
+        });
+
+    /* ── feature description helper ── */
+    function featureDesc(f) {
+        const map = {
+            'Subdomain enumeration': 'Discovers all live subdomains via brute-force wordlists and passive OSINT sources.',
+            'Port scanning':         'Checks open TCP ports across discovered hosts and fingerprints running services.',
+            'Technology detection':  'Identifies frameworks, CMS, CDN providers and WAFs from HTTP responses.',
+            'Email/user enumeration':'Generates and validates likely email addresses tied to the target organisation.',
+            'Security risk assessment': 'Scores the attack surface and surfaces the highest-impact findings first.',
+        };
+        return map[f] || 'Automated intelligence gathering module.';
+    }
+});
+</script>
+{% endblock %}
