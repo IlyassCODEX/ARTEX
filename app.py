@@ -37,6 +37,7 @@ from core.xxe_injector import XxeInjector
 from core.lfi_rfi import LfiRfi
 from core.ssrf_probe import SsrfProbe
 from core.vuln_scanner import VulnScanner
+from core.ratelimit_bypass import RateLimitBypass
 import os
 
 app = Flask(__name__)
@@ -318,6 +319,12 @@ def run_scan(scan_id, domain, options):
                 
                 vs = VulnScanner()
                 scan_results[scan_id]['vuln_scan'] = vs.run(
+                    domain=domain,
+                    scan_results=scan_results[scan_id],
+                )
+                
+                rl = RateLimitBypass()
+                scan_results[scan_id]['ratelimit_bypass'] = rl.run(
                     domain=domain,
                     scan_results=scan_results[scan_id],
                 )
