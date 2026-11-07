@@ -34,6 +34,8 @@ from core.auth_bypass import AuthBypass
 from core.cve_matcher import CveMatcher
 from core.session_hijack import SessionHijack
 from core.xxe_injector import XxeInjector
+from core.lfi_rfi import LfiRfi
+from core.ssrf_probe import SsrfProbe
 import os
 
 app = Flask(__name__)
@@ -306,6 +308,12 @@ def run_scan(scan_id, domain, options):
                     scan_results=scan_results[scan_id],
                 )
                 scan_status[scan_id]['progress'] = 88
+                
+                lr = LfiRfi()
+                scan_results[scan_id]['lfi_rfi'] = lr.run(domain=domain, scan_results=scan_results[scan_id])
+                
+                sp = SsrfProbe()
+                scan_results[scan_id]['ssrf_probe'] = sp.run(domain=domain, scan_results=scan_results[scan_id])
                 
                 xi = XxeInjector()
                 scan_results[scan_id]['xxe_injection'] = xi.run(
