@@ -36,6 +36,7 @@ from core.session_hijack import SessionHijack
 from core.xxe_injector import XxeInjector
 from core.lfi_rfi import LfiRfi
 from core.ssrf_probe import SsrfProbe
+from core.vuln_scanner import VulnScanner
 import os
 
 app = Flask(__name__)
@@ -314,6 +315,12 @@ def run_scan(scan_id, domain, options):
                 
                 sp = SsrfProbe()
                 scan_results[scan_id]['ssrf_probe'] = sp.run(domain=domain, scan_results=scan_results[scan_id])
+                
+                vs = VulnScanner()
+                scan_results[scan_id]['vuln_scan'] = vs.run(
+                    domain=domain,
+                    scan_results=scan_results[scan_id],
+                )
                 
                 xi = XxeInjector()
                 scan_results[scan_id]['xxe_injection'] = xi.run(
