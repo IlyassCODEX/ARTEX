@@ -55,6 +55,7 @@ from core.lfi_rfi import LfiRfi
 from core.ssrf_probe import SsrfProbe
 from core.vuln_scanner import VulnScanner
 from core.ratelimit_bypass import RateLimitBypass
+from core.cors_tester import CorsTester
 import os
 
 app = Flask(__name__)
@@ -476,6 +477,12 @@ def run_scan(scan_id, domain, options):
                 
                 chain = ExploitChain()
                 scan_results[scan_id]['exploit_chain'] = chain.run(
+                    domain=domain,
+                    scan_results=scan_results[scan_id],
+                )
+                
+                ct = CorsTester()
+                scan_results[scan_id]['cors_tester'] = ct.run(
                     domain=domain,
                     scan_results=scan_results[scan_id],
                 )
