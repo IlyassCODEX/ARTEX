@@ -18,6 +18,7 @@ from modules.web_vuln_scanner import WebVulnScanner
 from modules.shodan_probe import ShodanProbe
 from modules.reverse_whois import ReverseWhois
 from modules.cache_poisoning_probe import CachePoisoningProbe
+from modules.websocket_scanner import WebSocketScanner
 from modules.FastAnalyst import FastSecurityAnalyst
 from modules.AI_analyst import AIAnalyst
 from modules.AI_header_analyzer import AIHeaderAnalyzer
@@ -133,6 +134,7 @@ def start_scan():
         'shodan_probe': True,
         'reverse_whois': True,
         'cache_poisoning': True,
+        'websocket_scanner': True,
     })
     
     if not validate_domain(domain):
@@ -183,6 +185,7 @@ def start_scan():
         'shodan_probe': {},
         'reverse_whois': {},
         'cache_poisoning': {},
+        'websocket_scanner': {},
         'scan_id': scan_id,
         'timestamp': datetime.now().isoformat(),
         'options': options,
@@ -291,6 +294,19 @@ def run_scan(scan_id, domain, options):
                 except Exception as e:
                     print(f"[reverse_whois] error: {e}")
                     scan_results[scan_id]['reverse_whois'] = {'error': str(e)}
+                    
+            if options.get('websocket_scanner', True):
+                scan_status[scan_id]['current_task'] = 'Scanning WebSocket endpoints...'
+                try:
+                    ws = WebSocketScanner(
+                        target_url=f"https://{domain}",
+                        rate_delay=0.2,
+                        max_workers=10,
+                    )
+                    scan_results[scan_id]['websocket_scanner'] = ws.scan()
+                except Exception as e:
+                    print(f"[websocket_scanner] error: {e}")
+                    scan_results[scan_id]['websocket_scanner'] = {'error': str(e)}
 
 
             if options.get('real_ip', True):
