@@ -33,6 +33,7 @@ from utils.ai_recon_orchestrator import run_recon_orchestrator
 from utils.ai_payload_mutator import run_payload_mutator
 from utils.ai_vuln_scorer import run_vuln_scorer
 from utils.ai_session_manager import run_session_manager, SessionCommand
+from utils.ai_decision_engine import run_decision_engine
 from modules.AI_osint_correlator import AIOSINTCorrelator
 from modules.AI_payload_generator import AIPayloadGenerator
 from core.exploit_chain import ExploitChain
@@ -100,7 +101,10 @@ def start_scan():
             SessionCommand.MAINTAIN_ACCESS.value,
             SessionCommand.ESCALATE_HEADERS.value,
             SessionCommand.PIVOT_ENDPOINT.value,
-        ]
+        ],
+        'decision_engine': False,
+        'engine_mode': 'balanced',   # aggressive / stealth / balanced / fast / thorough
+        'engine_max_cycles': 12,
         'orchestrator_mode': 'full_recon',
         'intensity': 'normal'
     })
@@ -142,6 +146,7 @@ def start_scan():
         'payload_mutator': {},
         'vuln_score': {},
         'session_manager': {},
+        'decision_engine': {},
         'scan_id': scan_id,
         'timestamp': datetime.now().isoformat(),
         'options': options
@@ -509,6 +514,20 @@ def run_scan(scan_id, domain, options):
                     )
                 except Exception as e:
                     scan_results[scan_id]['vuln_score'] = {'error': str(e)}
+                    
+            if options.get('decision_engine'):
+                scan_status[scan_id]['current_task'] = 'AI Decision Engine...'
+                try:
+                    scan_results[scan_id]['decision_engine'] = run_decision_engine(
+                        target_url=target_base_url,
+                        scan_results=scan_results[scan_id],
+                        mode=options.get('engine_mode', 'balanced'),
+                        max_cycles=options.get('engine_max_cycles', 12),
+                        max_actions_per_cycle=4,
+                        cycle_delay=0.2,
+                    )
+                except Exception as e:
+                    scan_results[scan_id]['decision_engine'] = {'error': str(e)}
             
             # Run security analysis
             scan_status[scan_id]['current_task'] = 'Running security analysis...'
