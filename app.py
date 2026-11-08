@@ -27,6 +27,7 @@ from utils.waf_fingerprinter import run_waf_fingerprint
 from utils.js_secret_extractor import run_js_secret_extraction
 from utils.credential_sprayer import run_credential_spray
 from utils.cors_auditor import run_cors_audit
+from utils.ai_mouse_agent import run_ai_mouse_agent
 from modules.AI_osint_correlator import AIOSINTCorrelator
 from modules.AI_payload_generator import AIPayloadGenerator
 from core.exploit_chain import ExploitChain
@@ -83,6 +84,7 @@ def start_scan():
         'email': True,
         'security': True,
         'ai': True,
+        'ai_mouse_agent': False,
         'intensity': 'normal'
     })
     
@@ -402,6 +404,20 @@ def run_scan(scan_id, domain, options):
                     )
                 except Exception as e:
                     scan_results[scan_id]['credential_spray'] = {'error': str(e)}
+                    
+            if options.get('ai_mouse_agent'):
+                scan_status[scan_id]['current_task'] = 'AI Mouse Agent...'
+                try:
+                    creds = options.get('ai_mouse_credentials', [("admin", "admin")])
+                    scan_results[scan_id]['ai_mouse_agent'] = run_ai_mouse_agent(
+                        target_url=options.get('ai_mouse_url', target_base_url + '/login'),
+                        credentials=creds,
+                        max_attempts=options.get('ai_mouse_max_attempts', 5),
+                        headless=options.get('ai_mouse_headless', True),
+                        capture_screenshots=options.get('ai_mouse_screenshots', True),
+                    )
+                except Exception as e:
+                    scan_results[scan_id]['ai_mouse_agent'] = {'error': str(e)}
             
             # Run security analysis
             scan_status[scan_id]['current_task'] = 'Running security analysis...'
