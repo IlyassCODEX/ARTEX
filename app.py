@@ -20,6 +20,7 @@ from modules.reverse_whois import ReverseWhois
 from modules.cache_poisoning_probe import CachePoisoningProbe
 from modules.websocket_scanner import WebSocketScanner
 from modules.ai_db_exfil_agent import AIDNExfilAgent
+from modules.http_smuggling_probe import HTTPSmugglingProbe
 from modules.FastAnalyst import FastSecurityAnalyst
 from modules.AI_analyst import AIAnalyst
 from modules.AI_header_analyzer import AIHeaderAnalyzer
@@ -137,6 +138,7 @@ def start_scan():
         'cache_poisoning': True,
         'websocket_scanner': True,
         'ai_db_exfil': True,
+        'http_smuggling': True,
     })
     
     if not validate_domain(domain):
@@ -189,6 +191,7 @@ def start_scan():
         'cache_poisoning': {},
         'websocket_scanner': {},
         'ai_db_exfil': {},
+        'http_smuggling': {},
         'scan_id': scan_id,
         'timestamp': datetime.now().isoformat(),
         'options': options,
@@ -401,6 +404,19 @@ def run_scan(scan_id, domain, options):
                     domain=domain,
                     scan_results=scan_results[scan_id],
                 )
+                
+            if options.get('http_smuggling', True):
+                scan_status[scan_id]['current_task'] = 'Probing HTTP request smuggling...'
+                try:
+                    smuggle = HTTPSmugglingProbe(
+                        target_url=f"https://{domain}",
+                        rate_delay=0.5,
+                        max_workers=6,
+                    )
+                    scan_results[scan_id]['http_smuggling'] = smuggle.scan()
+                except Exception as e:
+                    print(f"[http_smuggling] error: {e}")
+                    scan_results[scan_id]['http_smuggling'] = {'error': str(e)}
 
             # Run technology detection
             if options.get('tech', True):
