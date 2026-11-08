@@ -10,16 +10,19 @@ from modules.dns_scan import DNSScanner
 from modules.ssl_scanner import SSLScanner
 from modules.tech_detector import TechnologyDetector
 from modules.enumeration import EmailUserEnumerator
+from modules.bypass_403 import Bypass403Scanner
 from modules.db_file_hunter import DBFileHunter
 from modules.vhost_fuzzer import VHostFuzzer
 from modules.dir_bruteforce import DirectoryBruteforcer
 from modules.web_vuln_scanner import WebVulnScanner
-from modules.FastAnalyst import FastSecurityAnalyst # Import FastSecurityAnalyst
+from modules.FastAnalyst import FastSecurityAnalyst
 from modules.AI_analyst import AIAnalyst
 from modules.AI_header_analyzer import AIHeaderAnalyzer
 from modules.AI_subdomain_takeover_analyzer import AISubdomainTakeoverAnalyzer
 from modules.AI_vuln_prioritizer import AIVulnPrioritizer
 from modules.AI_attack_path_planner import AIAttackPathPlanner
+from modules.AI_osint_correlator import AIOSINTCorrelator
+from modules.AI_payload_generator import AIPayloadGenerator
 from utils.reporting import ReportGenerator
 from utils.helpers import validate_domain, sanitize_domain
 from utils.header_injector import run_header_injection
@@ -37,8 +40,6 @@ from utils.ai_decision_engine import run_decision_engine
 from utils.ai_exfil_planner import run_exfil_planner
 from utils.ai_lateral_mover import run_lateral_mover
 from utils.ai_persistence_agent import run_persistence_agent
-from modules.AI_osint_correlator import AIOSINTCorrelator
-from modules.AI_payload_generator import AIPayloadGenerator
 from core.exploit_chain import ExploitChain
 from core.auth_bypass import AuthBypass
 from core.cve_matcher import CveMatcher
@@ -120,7 +121,12 @@ def start_scan():
         'c2_port': 4444,
         'persistence_stealth': True,
         'orchestrator_mode': 'full_recon',
-        'intensity': 'normal'
+        'intensity': 'normal',
+        'web_vuln': True,
+        'dir_bruteforce': True,
+        'vhost_fuzzer': True,
+        'db_file_hunter': True,
+        'bypass_403': True,
     })
     
     if not validate_domain(domain):
@@ -155,6 +161,11 @@ def start_scan():
         'email_enumeration': {},
         'security_analysis': {},
         'ai_analysis': {},
+        'web_vuln': {},
+        'dir_bruteforce': {},
+        'vhost_fuzzer': {},
+        'db_file_hunter': {},
+        'bypass_403': {},
         'redirect_trace': {},
         'orchestrator': {},
         'payload_mutator': {},
@@ -583,6 +594,82 @@ def run_scan(scan_id, domain, options):
                     )
                 except Exception as e:
                     scan_results[scan_id]['exfil_plan'] = {'error': str(e)}
+                    
+            # ── Offensive modules ──────────────────────────────────────────
+            if options.get('web_vuln', True):
+                scan_status[scan_id]['current_task'] = 'Running web vulnerability scan...'
+                try:
+                    web_scanner = WebVulnScanner(
+                        target_url=f"https://{domain}",
+                    )
+                    scan_results[scan_id]['web_vuln'] = web_scanner.scan(domain)
+                except Exception as e:
+                    print(f"[web_vuln] error: {e}")
+                    scan_results[scan_id]['web_vuln'] = {'error': str(e)}
+                    
+            if options.get('dir_bruteforce', True):
+                scan_status[scan_id]['current_task'] = 'Brute-forcing directories...'
+                try:
+                    brute = DirectoryBruteforcer(
+                        target_url=f"https://{domain}",
+                        recursive=False,
+                        max_workers=20,
+                    )
+                    scan_results[scan_id]['dir_bruteforce'] = brute.scan()
+                except Exception as e:
+                    print(f"[dir_bruteforce] error: {e}")
+                    scan_results[scan_id]['dir_bruteforce'] = {'error': str(e)}
+                    
+            if options.get('vhost_fuzzer', True):
+                scan_status[scan_id]['current_task'] = 'Fuzzing virtual hosts...'
+                try:
+                    # Reuse real IP if already discovered by real_ip module
+                    real_ip_data = scan_results[scan_id].get('real_ip', {})
+                    origin_ips   = real_ip_data.get('origin_ips', [])
+                    target_ip    = origin_ips[0]['ip'] if origin_ips else None
+                    fuzzer = VHostFuzzer(
+                        domain=domain,
+                        target_ip=target_ip,
+                        port=443,
+                        scheme='https',
+                    )
+                    scan_results[scan_id]['vhost_fuzzer'] = fuzzer.scan()
+                except Exception as e:
+                    print(f"[vhost_fuzzer] error: {e}")
+                    scan_results[scan_id]['vhost_fuzzer'] = {'error': str(e)}
+                    
+            if options.get('db_file_hunter', True):
+                scan_status[scan_id]['current_task'] = 'Hunting exposed database files...'
+                try:
+                    hunter = DBFileHunter(
+                        target_url=f"https://{domain}",
+                        enable_mutations=True,
+                        enable_dir_variants=True,
+                        max_workers=16,
+                    )
+                    scan_results[scan_id]['db_file_hunter'] = hunter.scan()
+                except Exception as e:
+                    print(f"[db_file_hunter] error: {e}")
+                    scan_results[scan_id]['db_file_hunter'] = {'error': str(e)}
+                    
+            if options.get('bypass_403', True):
+                scan_status[scan_id]['current_task'] = 'Attempting 403 bypass...'
+                try:
+                    # Feed known 403 URLs from dir_bruteforce results if available
+                    brute_results = scan_results[scan_id].get('dir_bruteforce', {})
+                    known_403 = [
+                        r['url'] for r in brute_results.get('results', [])
+                        if r.get('status') == 403
+                    ]
+                    bypass = Bypass403Scanner(
+                        target_url=f"https://{domain}",
+                        known_403_urls=known_403,
+                        max_workers=20,
+                    )
+                    scan_results[scan_id]['bypass_403'] = bypass.scan()
+                except Exception as e:
+                    print(f"[bypass_403] error: {e}")
+                    scan_results[scan_id]['bypass_403'] = {'error': str(e)}
             
             # Run security analysis
             scan_status[scan_id]['current_task'] = 'Running security analysis...'
