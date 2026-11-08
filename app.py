@@ -24,6 +24,7 @@ from modules.http_smuggling_probe import HTTPSmugglingProbe
 from modules.ssti_scanner import SSTIScanner
 from modules.network_range_mapper import NetworkRangeMapper
 from modules.jwt_analyzer import JWTAnalyzer
+from modules.smtp_enum import SMTPEnumerator
 from modules.FastAnalyst import FastSecurityAnalyst
 from modules.AI_analyst import AIAnalyst
 from modules.AI_header_analyzer import AIHeaderAnalyzer
@@ -146,6 +147,7 @@ def start_scan():
         'ssti_scanner': True,
         'network_mapper': True,
         'jwt_analyzer': True,
+        'smtp_enum': True,
     })
     
     if not validate_domain(domain):
@@ -202,6 +204,7 @@ def start_scan():
         'ssti_scanner': {},
         'network_mapper': {},
         'jwt_analyzer': {},
+        'smtp_enum': {},
         'scan_id': scan_id,
         'timestamp': datetime.now().isoformat(),
         'options': options,
@@ -436,6 +439,19 @@ def run_scan(scan_id, domain, options):
                 except Exception as e:
                     print(f"[jwt_analyzer] error: {e}")
                     scan_results[scan_id]['jwt_analyzer'] = {'error': str(e)}
+                    
+            if options.get('smtp_enum', True):
+                scan_status[scan_id]['current_task'] = 'Enumerating SMTP users...'
+                try:
+                    smtp = SMTPEnumerator(
+                        domain=domain,
+                        rate_delay=0.1,
+                        max_workers=15,
+                    )
+                    scan_results[scan_id]['smtp_enum'] = smtp.scan()
+                except Exception as e:
+                    print(f"[smtp_enum] error: {e}")
+                    scan_results[scan_id]['smtp_enum'] = {'error': str(e)}
 
 
             # In the run_scan function, update the SSL scan section:
