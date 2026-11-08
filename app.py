@@ -25,6 +25,7 @@ from modules.ssti_scanner import SSTIScanner
 from modules.network_range_mapper import NetworkRangeMapper
 from modules.jwt_analyzer import JWTAnalyzer
 from modules.smtp_enum import SMTPEnumerator
+from modules.snmp_scan import SNMPScanner
 from modules.FastAnalyst import FastSecurityAnalyst
 from modules.AI_analyst import AIAnalyst
 from modules.AI_header_analyzer import AIHeaderAnalyzer
@@ -148,6 +149,7 @@ def start_scan():
         'network_mapper': True,
         'jwt_analyzer': True,
         'smtp_enum': True,
+        'snmp_scan': True,
     })
     
     if not validate_domain(domain):
@@ -205,6 +207,7 @@ def start_scan():
         'network_mapper': {},
         'jwt_analyzer': {},
         'smtp_enum': {},
+        'snmp_scan': {},
         'scan_id': scan_id,
         'timestamp': datetime.now().isoformat(),
         'options': options,
@@ -452,7 +455,20 @@ def run_scan(scan_id, domain, options):
                 except Exception as e:
                     print(f"[smtp_enum] error: {e}")
                     scan_results[scan_id]['smtp_enum'] = {'error': str(e)}
-
+                    
+            if options.get('snmp_scan', True):
+                scan_status[scan_id]['current_task'] = 'Scanning SNMP services...'
+                try:
+                    snmp = SNMPScanner(
+                        domain=domain,
+                        timeout=2.0,
+                        max_workers=25,
+                        walk_enabled=True,
+                    )
+                    scan_results[scan_id]['snmp_scan'] = snmp.scan()
+                except Exception as e:
+                    print(f"[snmp_scan] error: {e}")
+                    scan_results[scan_id]['snmp_scan'] = {'error': str(e)}
 
             # In the run_scan function, update the SSL scan section:
             if options.get('ssl', True):
