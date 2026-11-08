@@ -32,6 +32,7 @@ from utils.redirect_tracer import run_redirect_trace
 from utils.ai_recon_orchestrator import run_recon_orchestrator
 from utils.ai_payload_mutator import run_payload_mutator
 from utils.ai_vuln_scorer import run_vuln_scorer
+from utils.ai_session_manager import run_session_manager, SessionCommand
 from modules.AI_osint_correlator import AIOSINTCorrelator
 from modules.AI_payload_generator import AIPayloadGenerator
 from core.exploit_chain import ExploitChain
@@ -93,6 +94,13 @@ def start_scan():
         'orchestrator': False,
         'payload_mutator': False,
         'vuln_score': True,
+        'session_manager': False,
+        'session_commands': [
+            SessionCommand.ELEVATE_PRIVILEGE.value,
+            SessionCommand.MAINTAIN_ACCESS.value,
+            SessionCommand.ESCALATE_HEADERS.value,
+            SessionCommand.PIVOT_ENDPOINT.value,
+        ]
         'orchestrator_mode': 'full_recon',
         'intensity': 'normal'
     })
@@ -133,6 +141,7 @@ def start_scan():
         'orchestrator': {},
         'payload_mutator': {},
         'vuln_score': {},
+        'session_manager': {},
         'scan_id': scan_id,
         'timestamp': datetime.now().isoformat(),
         'options': options
@@ -417,6 +426,24 @@ def run_scan(scan_id, domain, options):
                     )
                 except Exception as e:
                     scan_results[scan_id]['credential_spray'] = {'error': str(e)}
+                    
+            if options.get('session_manager'):
+                scan_status[scan_id]['current_task'] = 'AI Session Management...'
+                creds_to_use = options.get('credentials', [])
+                spray_result = scan_results[scan_id].get('credential_spray', {})
+                spray_hits = spray_result.get('successful_logins', [])
+                if spray_hits:
+                    creds_to_use = [{'username': h['username'], 'password': h['password']} for h in spray_hits[:5]]
+                try:
+                    scan_results[scan_id]['session_manager'] = run_session_manager(
+                        target_url=target_base_url,
+                        credentials=creds_to_use,
+                        commands=options.get('session_commands'),
+                        delay=options.get('session_delay', 0.3),
+                        proxy=options.get('proxy'),
+                    )
+                except Exception as e:
+                    scan_results[scan_id]['session_manager'] = {'error': str(e)}
                     
             if options.get('ai_mouse_agent'):
                 scan_status[scan_id]['current_task'] = 'AI Mouse Agent...'
