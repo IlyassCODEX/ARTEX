@@ -410,6 +410,32 @@ def run_scan(scan_id, domain, options):
                 except Exception as e:
                     print(f"[network_range_mapper] error: {e}")
                     scan_results[scan_id]['network_range_mapper'] = {'error': str(e)}
+                    
+            if options.get('jwt_analyzer', True):
+                scan_status[scan_id]['current_task'] = 'Analysing JWT tokens...'
+                try:
+                    # Feed known tokens from web_vuln results
+                    web_vuln = scan_results[scan_id].get('web_vuln', {})
+                    known_tokens = []
+                    for f in web_vuln.get('findings', []):
+                        if f.get('attack_type') == 'jwt' and f.get('evidence'):
+                            import re as _re
+                            m = _re.search(
+                                r'eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*',
+                                f['evidence'],
+                            )
+                            if m:
+                                known_tokens.append(m.group(0))
+                    jwt = JWTAnalyzer(
+                        target_url=f"https://{domain}",
+                        known_tokens=known_tokens,
+                        rate_delay=0.2,
+                        max_workers=15,
+                    )
+                    scan_results[scan_id]['jwt_analyzer'] = jwt.scan()
+                except Exception as e:
+                    print(f"[jwt_analyzer] error: {e}")
+                    scan_results[scan_id]['jwt_analyzer'] = {'error': str(e)}
 
 
             # In the run_scan function, update the SSL scan section:
