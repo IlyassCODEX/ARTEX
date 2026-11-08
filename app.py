@@ -35,6 +35,7 @@ from utils.ai_vuln_scorer import run_vuln_scorer
 from utils.ai_session_manager import run_session_manager, SessionCommand
 from utils.ai_decision_engine import run_decision_engine
 from utils.ai_exfil_planner import run_exfil_planner
+from utils.ai_lateral_mover import run_lateral_mover
 from modules.AI_osint_correlator import AIOSINTCorrelator
 from modules.AI_payload_generator import AIPayloadGenerator
 from core.exploit_chain import ExploitChain
@@ -110,6 +111,9 @@ def start_scan():
         'oob_domain': 'OOB_SERVER_PLACEHOLDER.com',
         'exfil_noise_budget': 0.6,
         'exfil_stealth': False,
+        'lateral_move': False,
+        'lateral_fast_mode': False,
+        'lateral_delay': 0.15,
         'orchestrator_mode': 'full_recon',
         'intensity': 'normal'
     })
@@ -153,6 +157,7 @@ def start_scan():
         'session_manager': {},
         'decision_engine': {},
         'exfil_plan': {},
+        'lateral_move': {},
         'scan_id': scan_id,
         'timestamp': datetime.now().isoformat(),
         'options': options
@@ -534,6 +539,19 @@ def run_scan(scan_id, domain, options):
                     )
                 except Exception as e:
                     scan_results[scan_id]['decision_engine'] = {'error': str(e)}
+                    
+            if options.get('lateral_move'):
+                scan_status[scan_id]['current_task'] = 'AI Lateral Movement...'
+                try:
+                    scan_results[scan_id]['lateral_move'] = run_lateral_mover(
+                        target_url=target_base_url,
+                        scan_results=scan_results[scan_id],
+                        delay=options.get('lateral_delay', 0.15),
+                        proxy=options.get('proxy'),
+                        fast_mode=options.get('lateral_fast_mode', False),
+                    )
+                except Exception as e:
+                    scan_results[scan_id]['lateral_move'] = {'error': str(e)}
                     
             if options.get('exfil_plan'):
                 scan_status[scan_id]['current_task'] = 'AI Exfil Planning...'
