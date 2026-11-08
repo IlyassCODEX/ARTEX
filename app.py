@@ -30,6 +30,7 @@ from utils.cors_auditor import run_cors_audit
 from utils.ai_mouse_agent import run_ai_mouse_agent
 from utils.redirect_tracer import run_redirect_trace
 from utils.ai_recon_orchestrator import run_recon_orchestrator
+from utils.ai_payload_mutator import run_payload_mutator
 from modules.AI_osint_correlator import AIOSINTCorrelator
 from modules.AI_payload_generator import AIPayloadGenerator
 from core.exploit_chain import ExploitChain
@@ -89,6 +90,7 @@ def start_scan():
         'ai_mouse_agent': False,
         'redirect_trace': True,
         'orchestrator': False,
+        'payload_mutator': False,
         'orchestrator_mode': 'full_recon',
         'intensity': 'normal'
     })
@@ -127,6 +129,7 @@ def start_scan():
         'ai_analysis': {},
         'redirect_trace': {},
         'orchestrator': {},
+        'payload_mutator': {},
         'scan_id': scan_id,
         'timestamp': datetime.now().isoformat(),
         'options': options
@@ -450,6 +453,22 @@ def run_scan(scan_id, domain, options):
                     )
                 except Exception as e:
                     scan_results[scan_id]['orchestrator'] = {'error': str(e)}
+                    
+            if options.get('payload_mutator'):
+                scan_status[scan_id]['current_task'] = 'AI Payload Mutator...'
+                try:
+                    waf_vendor = scan_results[scan_id].get('waf_fingerprint', {}).get('vendor', '')
+                    scan_results[scan_id]['payload_mutator'] = run_payload_mutator(
+                        target_url=target_base_url,
+                        param=options.get('mutator_param', 'q'),
+                        category=options.get('mutator_category', 'xss'),
+                        evolution_target=options.get('mutator_target', 'waf_bypass'),
+                        generations=options.get('mutator_generations', 5),
+                        population_size=options.get('mutator_population', 10),
+                        waf_vendor=waf_vendor,
+                    )
+                except Exception as e:
+                    scan_results[scan_id]['payload_mutator'] = {'error': str(e)}
             
             # Run security analysis
             scan_status[scan_id]['current_task'] = 'Running security analysis...'
