@@ -29,6 +29,7 @@ from utils.credential_sprayer import run_credential_spray
 from utils.cors_auditor import run_cors_audit
 from utils.ai_mouse_agent import run_ai_mouse_agent
 from utils.redirect_tracer import run_redirect_trace
+from utils.ai_recon_orchestrator import run_recon_orchestrator
 from modules.AI_osint_correlator import AIOSINTCorrelator
 from modules.AI_payload_generator import AIPayloadGenerator
 from core.exploit_chain import ExploitChain
@@ -87,6 +88,8 @@ def start_scan():
         'ai': True,
         'ai_mouse_agent': False,
         'redirect_trace': True,
+        'orchestrator': False,
+        'orchestrator_mode': 'full_recon',
         'intensity': 'normal'
     })
     
@@ -123,6 +126,7 @@ def start_scan():
         'security_analysis': {},
         'ai_analysis': {},
         'redirect_trace': {},
+        'orchestrator': {},
         'scan_id': scan_id,
         'timestamp': datetime.now().isoformat(),
         'options': options
@@ -428,6 +432,24 @@ def run_scan(scan_id, domain, options):
                     scan_results[scan_id]['redirect_trace'] = run_redirect_trace(target_base_url)
                 except Exception as e:
                     scan_results[scan_id]['redirect_trace'] = {'error': str(e)}
+                    
+            if options.get('orchestrator'):
+                scan_status[scan_id]['current_task'] = 'AI Recon Orchestrator...'
+                
+                def _orch_status(msg: str):
+                    scan_status[scan_id]['current_task'] = f'Orchestrator: {msg}'
+                    
+                try:
+                    scan_results[scan_id]['orchestrator'] = run_recon_orchestrator(
+                        target_url=target_base_url,
+                        instruction_mode=options.get('orchestrator_mode', 'full_recon'),
+                        credentials=options.get('orchestrator_credentials'),
+                        credential_spray_url=options.get('credential_spray_url'),
+                        mouse_agent_url=options.get('ai_mouse_url'),
+                        status_callback=_orch_status,
+                    )
+                except Exception as e:
+                    scan_results[scan_id]['orchestrator'] = {'error': str(e)}
             
             # Run security analysis
             scan_status[scan_id]['current_task'] = 'Running security analysis...'
