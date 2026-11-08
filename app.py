@@ -34,6 +34,7 @@ from utils.ai_payload_mutator import run_payload_mutator
 from utils.ai_vuln_scorer import run_vuln_scorer
 from utils.ai_session_manager import run_session_manager, SessionCommand
 from utils.ai_decision_engine import run_decision_engine
+from utils.ai_exfil_planner import run_exfil_planner
 from modules.AI_osint_correlator import AIOSINTCorrelator
 from modules.AI_payload_generator import AIPayloadGenerator
 from core.exploit_chain import ExploitChain
@@ -105,6 +106,10 @@ def start_scan():
         'decision_engine': False,
         'engine_mode': 'balanced',   # aggressive / stealth / balanced / fast / thorough
         'engine_max_cycles': 12,
+        'exfil_plan': False,
+        'oob_domain': 'OOB_SERVER_PLACEHOLDER.com',
+        'exfil_noise_budget': 0.6,
+        'exfil_stealth': False,
         'orchestrator_mode': 'full_recon',
         'intensity': 'normal'
     })
@@ -147,6 +152,7 @@ def start_scan():
         'vuln_score': {},
         'session_manager': {},
         'decision_engine': {},
+        'exfil_plan': {},
         'scan_id': scan_id,
         'timestamp': datetime.now().isoformat(),
         'options': options
@@ -528,6 +534,19 @@ def run_scan(scan_id, domain, options):
                     )
                 except Exception as e:
                     scan_results[scan_id]['decision_engine'] = {'error': str(e)}
+                    
+            if options.get('exfil_plan'):
+                scan_status[scan_id]['current_task'] = 'AI Exfil Planning...'
+                try:
+                    scan_results[scan_id]['exfil_plan'] = run_exfil_planner(
+                        target_url=target_base_url,
+                        scan_results=scan_results[scan_id],
+                        oob_domain=options.get('oob_domain', 'OOB_SERVER_PLACEHOLDER.com'),
+                        noise_budget=options.get('exfil_noise_budget', 0.6),
+                        stealth_mode=options.get('exfil_stealth', False),
+                    )
+                except Exception as e:
+                    scan_results[scan_id]['exfil_plan'] = {'error': str(e)}
             
             # Run security analysis
             scan_status[scan_id]['current_task'] = 'Running security analysis...'
