@@ -19,6 +19,7 @@ from modules.shodan_probe import ShodanProbe
 from modules.reverse_whois import ReverseWhois
 from modules.cache_poisoning_probe import CachePoisoningProbe
 from modules.websocket_scanner import WebSocketScanner
+from modules.ai_db_exfil_agent import AIDNExfilAgent
 from modules.FastAnalyst import FastSecurityAnalyst
 from modules.AI_analyst import AIAnalyst
 from modules.AI_header_analyzer import AIHeaderAnalyzer
@@ -135,6 +136,7 @@ def start_scan():
         'reverse_whois': True,
         'cache_poisoning': True,
         'websocket_scanner': True,
+        'ai_db_exfil': True,
     })
     
     if not validate_domain(domain):
@@ -186,6 +188,7 @@ def start_scan():
         'reverse_whois': {},
         'cache_poisoning': {},
         'websocket_scanner': {},
+        'ai_db_exfil': {},
         'scan_id': scan_id,
         'timestamp': datetime.now().isoformat(),
         'options': options,
@@ -728,6 +731,18 @@ def run_scan(scan_id, domain, options):
                 except Exception as e:
                     print(f"[bypass_403] error: {e}")
                     scan_results[scan_id]['bypass_403'] = {'error': str(e)}
+                    
+            if options.get('ai_db_exfil', True):
+                scan_status[scan_id]['current_task'] = 'Running AI database exfiltration assessment...'
+                try:
+                    agent = AIDBExfilAgent(
+                        target_url=f"https://{domain}",
+                        groq_api_key=os.getenv('GROQ_API_KEY'),
+                    )
+                    scan_results[scan_id]['ai_db_exfil'] = agent.scan()
+                except Exception as e:
+                    print(f"[ai_db_exfil] error: {e}")
+                    scan_results[scan_id]['ai_db_exfil'] = {'error': str(e)}
                     
             if options.get('cache_poisoning', True):
                 scan_status[scan_id]['current_task'] = 'Probing cache poisoning vectors...'
