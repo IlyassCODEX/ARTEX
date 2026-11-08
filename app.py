@@ -31,6 +31,7 @@ from utils.ai_mouse_agent import run_ai_mouse_agent
 from utils.redirect_tracer import run_redirect_trace
 from utils.ai_recon_orchestrator import run_recon_orchestrator
 from utils.ai_payload_mutator import run_payload_mutator
+from utils.ai_vuln_scorer import run_vuln_scorer
 from modules.AI_osint_correlator import AIOSINTCorrelator
 from modules.AI_payload_generator import AIPayloadGenerator
 from core.exploit_chain import ExploitChain
@@ -91,6 +92,7 @@ def start_scan():
         'redirect_trace': True,
         'orchestrator': False,
         'payload_mutator': False,
+        'vuln_score': True,
         'orchestrator_mode': 'full_recon',
         'intensity': 'normal'
     })
@@ -130,6 +132,7 @@ def start_scan():
         'redirect_trace': {},
         'orchestrator': {},
         'payload_mutator': {},
+        'vuln_score': {},
         'scan_id': scan_id,
         'timestamp': datetime.now().isoformat(),
         'options': options
@@ -469,6 +472,16 @@ def run_scan(scan_id, domain, options):
                     )
                 except Exception as e:
                     scan_results[scan_id]['payload_mutator'] = {'error': str(e)}
+                    
+            if options.get('vuln_score'):
+                scan_status[scan_id]['current_task'] = 'AI Vuln Scoring...'
+                try:
+                    scan_results[scan_id]['vuln_score'] = run_vuln_scorer(
+                        scan_results=scan_results[scan_id],
+                        target_url=target_base_url,
+                    )
+                except Exception as e:
+                    scan_results[scan_id]['vuln_score'] = {'error': str(e)}
             
             # Run security analysis
             scan_status[scan_id]['current_task'] = 'Running security analysis...'
