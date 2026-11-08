@@ -23,6 +23,7 @@ from modules.ai_db_exfil_agent import AIDNExfilAgent
 from modules.http_smuggling_probe import HTTPSmugglingProbe
 from modules.ssti_scanner import SSTIScanner
 from modules.network_range_mapper import NetworkRangeMapper
+from modules.jwt_analyzer import JWTAnalyzer
 from modules.FastAnalyst import FastSecurityAnalyst
 from modules.AI_analyst import AIAnalyst
 from modules.AI_header_analyzer import AIHeaderAnalyzer
@@ -144,6 +145,7 @@ def start_scan():
         'http_smuggling': True,
         'ssti_scanner': True,
         'network_mapper': True,
+        'jwt_analyzer': True,
     })
     
     if not validate_domain(domain):
@@ -199,6 +201,7 @@ def start_scan():
         'http_smuggling': {},
         'ssti_scanner': {},
         'network_mapper': {},
+        'jwt_analyzer': {},
         'scan_id': scan_id,
         'timestamp': datetime.now().isoformat(),
         'options': options,
