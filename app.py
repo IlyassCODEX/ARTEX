@@ -16,6 +16,7 @@ from modules.vhost_fuzzer import VHostFuzzer
 from modules.dir_bruteforce import DirectoryBruteforcer
 from modules.web_vuln_scanner import WebVulnScanner
 from modules.shodan_probe import ShodanProbe
+from modules.reverse_whois import ReverseWhois
 from modules.FastAnalyst import FastSecurityAnalyst
 from modules.AI_analyst import AIAnalyst
 from modules.AI_header_analyzer import AIHeaderAnalyzer
@@ -129,6 +130,7 @@ def start_scan():
         'db_file_hunter': True,
         'bypass_403': True,
         'shodan_probe': True,
+        'reverse_whois': True,
     })
     
     if not validate_domain(domain):
@@ -177,6 +179,7 @@ def start_scan():
         'exfil_plan': {},
         'lateral_move': {},
         'shodan_probe': {},
+        'reverse_whois': {},
         'scan_id': scan_id,
         'timestamp': datetime.now().isoformat(),
         'options': options,
@@ -272,6 +275,19 @@ def run_scan(scan_id, domain, options):
                 aggressive = options.get('intensity', 'normal') == 'aggressive'
                 scan_results[scan_id]['dns_records'] = dns_scanner.scan(aggressive=aggressive)
                 scan_status[scan_id]['progress'] = 50
+                
+            if options.get('reverse_whois', True):
+                scan_status[scan_id]['current_task'] = 'Running reverse WHOIS pivot...'
+                try:
+                    rw = ReverseWhois(
+                        domain=domain,
+                        whoisxml_api_key=os.getenv('WHOISXML_API_KEY'),
+                        sectrails_api_key=os.getenv('SECURITYTRAILS_API_KEY'),
+                    )
+                    scan_results[scan_id]['reverse_whois'] = rw.scan()
+                except Exception as e:
+                    print(f"[reverse_whois] error: {e}")
+                    scan_results[scan_id]['reverse_whois'] = {'error': str(e)}
 
 
             if options.get('real_ip', True):
