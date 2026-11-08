@@ -28,6 +28,7 @@ from utils.js_secret_extractor import run_js_secret_extraction
 from utils.credential_sprayer import run_credential_spray
 from utils.cors_auditor import run_cors_audit
 from utils.ai_mouse_agent import run_ai_mouse_agent
+from utils.redirect_tracer import run_redirect_trace
 from modules.AI_osint_correlator import AIOSINTCorrelator
 from modules.AI_payload_generator import AIPayloadGenerator
 from core.exploit_chain import ExploitChain
@@ -85,6 +86,7 @@ def start_scan():
         'security': True,
         'ai': True,
         'ai_mouse_agent': False,
+        'redirect_trace': True,
         'intensity': 'normal'
     })
     
@@ -120,6 +122,7 @@ def start_scan():
         'email_enumeration': {},
         'security_analysis': {},
         'ai_analysis': {},
+        'redirect_trace': {},
         'scan_id': scan_id,
         'timestamp': datetime.now().isoformat(),
         'options': options
@@ -418,6 +421,13 @@ def run_scan(scan_id, domain, options):
                     )
                 except Exception as e:
                     scan_results[scan_id]['ai_mouse_agent'] = {'error': str(e)}
+                    
+            if options.get('redirect_trace'):
+                scan_status[scan_id]['current_task'] = 'Redirect Tracing...'
+                try:
+                    scan_results[scan_id]['redirect_trace'] = run_redirect_trace(target_base_url)
+                except Exception as e:
+                    scan_results[scan_id]['redirect_trace'] = {'error': str(e)}
             
             # Run security analysis
             scan_status[scan_id]['current_task'] = 'Running security analysis...'
