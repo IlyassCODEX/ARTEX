@@ -22,6 +22,7 @@ from modules.websocket_scanner import WebSocketScanner
 from modules.ai_db_exfil_agent import AIDNExfilAgent
 from modules.http_smuggling_probe import HTTPSmugglingProbe
 from modules.ssti_scanner import SSTIScanner
+from modules.network_range_mapper import NetworkRangeMapper
 from modules.FastAnalyst import FastSecurityAnalyst
 from modules.AI_analyst import AIAnalyst
 from modules.AI_header_analyzer import AIHeaderAnalyzer
@@ -142,6 +143,7 @@ def start_scan():
         'ai_db_exfil': True,
         'http_smuggling': True,
         'ssti_scanner': True,
+        'network_mapper': True,
     })
     
     if not validate_domain(domain):
@@ -196,6 +198,7 @@ def start_scan():
         'ai_db_exfil': {},
         'http_smuggling': {},
         'ssti_scanner': {},
+        'network_mapper': {},
         'scan_id': scan_id,
         'timestamp': datetime.now().isoformat(),
         'options': options,
@@ -379,6 +382,31 @@ def run_scan(scan_id, domain, options):
                 except Exception as e:
                     print(f"[shodan_probe] error: {e}")
                     scan_results[scan_id]['shodan_probe'] = {'error': str(e)}
+                    
+            if options.get('network_range_mapper', True):
+                scan_status[scan_id]['current_task'] = 'Mapping network ranges and ASNs...'
+                try:
+                    real_ip_data = scan_results[scan_id].get('real_ip', {})
+                    seed_ips = {
+                        entry['ip']
+                        for entry in real_ip_data.get('origin_ips', [])
+                        if entry.get('ip')
+                    }
+                    # Also pull IPs from port scan results
+                    for ps in scan_results[scan_id].get('port_scan', []):
+                        if ps.get('ip'):
+                            seed_ips.add(ps['ip'])
+                    mapper = NetworkRangeMapper(
+                        domain=domain,
+                        seed_ips=seed_ips,
+                        shodan_api_key=os.getenv('SHODAN_API_KEY'),
+                        enumerate_hosts=True,
+                        fetch_history=True,
+                    )
+                    scan_results[scan_id]['network_range_mapper'] = mapper.scan()
+                except Exception as e:
+                    print(f"[network_range_mapper] error: {e}")
+                    scan_results[scan_id]['network_range_mapper'] = {'error': str(e)}
 
 
             # In the run_scan function, update the SSL scan section:
