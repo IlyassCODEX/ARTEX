@@ -17,6 +17,7 @@ from modules.dir_bruteforce import DirectoryBruteforcer
 from modules.web_vuln_scanner import WebVulnScanner
 from modules.shodan_probe import ShodanProbe
 from modules.reverse_whois import ReverseWhois
+from modules.cache_poisoning_probe import CachePoisoningProbe
 from modules.FastAnalyst import FastSecurityAnalyst
 from modules.AI_analyst import AIAnalyst
 from modules.AI_header_analyzer import AIHeaderAnalyzer
@@ -131,6 +132,7 @@ def start_scan():
         'bypass_403': True,
         'shodan_probe': True,
         'reverse_whois': True,
+        'cache_poisoning': True,
     })
     
     if not validate_domain(domain):
@@ -180,6 +182,7 @@ def start_scan():
         'lateral_move': {},
         'shodan_probe': {},
         'reverse_whois': {},
+        'cache_poisoning': {},
         'scan_id': scan_id,
         'timestamp': datetime.now().isoformat(),
         'options': options,
@@ -709,6 +712,19 @@ def run_scan(scan_id, domain, options):
                 except Exception as e:
                     print(f"[bypass_403] error: {e}")
                     scan_results[scan_id]['bypass_403'] = {'error': str(e)}
+                    
+            if options.get('cache_poisoning', True):
+                scan_status[scan_id]['current_task'] = 'Probing cache poisoning vectors...'
+                try:
+                    probe = CachePoisoningProbe(
+                        target_url=f"https://{domain}",
+                        rate_delay=0.3,
+                        max_workers=10,
+                    )
+                    scan_results[scan_id]['cache_poisoning'] = probe.scan()
+                except Exception as e:
+                    print(f"[cache_poisoning] error: {e}")
+                    scan_results[scan_id]['cache_poisoning'] = {'error': str(e)}
             
             # Run security analysis
             scan_status[scan_id]['current_task'] = 'Running security analysis...'
