@@ -15,6 +15,7 @@ from modules.db_file_hunter import DBFileHunter
 from modules.vhost_fuzzer import VHostFuzzer
 from modules.dir_bruteforce import DirectoryBruteforcer
 from modules.web_vuln_scanner import WebVulnScanner
+from modules.shodan_probe import ShodanProbe
 from modules.FastAnalyst import FastSecurityAnalyst
 from modules.AI_analyst import AIAnalyst
 from modules.AI_header_analyzer import AIHeaderAnalyzer
@@ -127,6 +128,7 @@ def start_scan():
         'vhost_fuzzer': True,
         'db_file_hunter': True,
         'bypass_403': True,
+        'shodan_probe': True,
     })
     
     if not validate_domain(domain):
@@ -174,9 +176,10 @@ def start_scan():
         'decision_engine': {},
         'exfil_plan': {},
         'lateral_move': {},
+        'shodan_probe': {},
         'scan_id': scan_id,
         'timestamp': datetime.now().isoformat(),
-        'options': options
+        'options': options,
     }
     
     # Start background scan
@@ -311,6 +314,26 @@ def run_scan(scan_id, domain, options):
                     deep=options.get('intensity') == 'aggressive',
                 )
                 scan_status[scan_id]['progress'] = 60  # Updated progress value
+                
+            if options.get('shodan_probe', True):
+                scan_status[scan_id]['current_task'] = 'Running Shodan deep probe...'
+                try:
+                    real_ip_data = scan_results[scan_id].get('real_ip', {})
+                    known_ips = {
+                        entry['ip']
+                        for entry in real_ip_data.get('origin_ips', [])
+                        if entry.get('ip')
+                    }
+                    probe = ShodanProbe(
+                        domain=domain,
+                        api_key=os.getenv('SHODAN_API_KEY'),
+                        known_ips=known_ips,
+                        target_url=f"https://{domain}",
+                    )
+                    scan_results[scan_id]['shodan_probe'] = probe.scan()
+                except Exception as e:
+                    print(f"[shodan_probe] error: {e}")
+                    scan_results[scan_id]['shodan_probe'] = {'error': str(e)}
 
 
             # In the run_scan function, update the SSL scan section:
