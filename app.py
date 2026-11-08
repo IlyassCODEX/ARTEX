@@ -21,6 +21,7 @@ from modules.cache_poisoning_probe import CachePoisoningProbe
 from modules.websocket_scanner import WebSocketScanner
 from modules.ai_db_exfil_agent import AIDNExfilAgent
 from modules.http_smuggling_probe import HTTPSmugglingProbe
+from modules.ssti_scanner import SSTIScanner
 from modules.FastAnalyst import FastSecurityAnalyst
 from modules.AI_analyst import AIAnalyst
 from modules.AI_header_analyzer import AIHeaderAnalyzer
@@ -140,6 +141,7 @@ def start_scan():
         'websocket_scanner': True,
         'ai_db_exfil': True,
         'http_smuggling': True,
+        'ssti_scanner': True,
     })
     
     if not validate_domain(domain):
@@ -193,6 +195,7 @@ def start_scan():
         'websocket_scanner': {},
         'ai_db_exfil': {},
         'http_smuggling': {},
+        'ssti_scanner': {},
         'scan_id': scan_id,
         'timestamp': datetime.now().isoformat(),
         'options': options,
@@ -615,6 +618,29 @@ def run_scan(scan_id, domain, options):
                     )
                 except Exception as e:
                     scan_results[scan_id]['payload_mutator'] = {'error': str(e)}
+                    
+            if options.get('ssti_scanner', True):
+                scan_status[scan_id]['current_task'] = 'Scanning for SSTI vulnerabilities...'
+                try:
+                    # Feed known params from web_vuln results if available
+                    web_vuln_data = scan_results[scan_id].get('web_vuln', {})
+                    known_params: Dict[str, List[str]] = {}
+                    for finding in web_vuln_data.get('findings', []):
+                        if finding.get('parameter'):
+                            url = finding.get('url', f"https://{domain}")
+                            known_params.setdefault(url, [])
+                            if finding['parameter'] not in known_params[url]:
+                                known_params[url].append(finding['parameter'])
+                    ssti = SSTIScanner(
+                        target_url=f"https://{domain}",
+                        known_params=known_params,
+                        rate_delay=0.2,
+                        max_workers=12,
+                    )
+                    scan_results[scan_id]['ssti_scanner'] = ssti.scan()
+                except Exception as e:
+                    print(f"[ssti_scanner] error: {e}")
+                    scan_results[scan_id]['ssti_scanner'] = {'error': str(e)}
                     
             if options.get('vuln_score'):
                 scan_status[scan_id]['current_task'] = 'AI Vuln Scoring...'
