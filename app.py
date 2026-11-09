@@ -54,6 +54,7 @@ from utils.ai_decision_engine import run_decision_engine
 from utils.ai_exfil_planner import run_exfil_planner
 from utils.ai_lateral_mover import run_lateral_mover
 from utils.ai_persistence_agent import run_persistence_agent
+from utils.ai_report_generator import AIReportGenerator
 from core.exploit_chain import ExploitChain
 from core.auth_bypass import AuthBypass
 from core.cve_matcher import CveMatcher
@@ -976,6 +977,14 @@ def run_scan(scan_id, domain, options):
             minutes, seconds = divmod(remainder, 60)
             scan_status[scan_id]['duration'] = f"{hours}h {minutes}m {seconds}s"
             
+            ai_report_gen = AIReportGenerator(groq_api_key=GROQ_API_KEY)
+            scan_results[scan_id]['red_team_report'] = ai_report_gen.generate(
+                domain=domain,
+                scan_results=scan_results[scan_id],
+            )
+            scan_status[scan_id]['progress'] = 100
+            scan_status[scan_id]['status']   = 'completed'
+            
     except Exception as e:
         scan_status[scan_id]['status'] = 'error'
         scan_status[scan_id]['error'] = str(e)
@@ -1326,6 +1335,43 @@ def batch_correlate(batch_id):
     correlator = AICrossTargetCorrelator(groq_api_key=GROQ_API_KEY)
     result = correlator.correlate_batch(batch)
     return jsonify(result)
+    
+@app.route('/report/<scan_id>/redteam')
+def red_team_report(scan_id):
+    if scan_id not in scan_results:
+        return jsonify({'error': 'Not found'}), 404
+    rpt = scan_results[scan_id].get('red_team_report', {})
+    fmt = request.args.get('format', 'json')
+    if fmt == 'json':
+        return jsonify(rpt)
+    if fmt == 'txt':
+        lines = [
+            "=" * 70,
+            f"  BITROT REPORT — {rpt.get('domain','?').upper()}",
+            f"  Report ID: {rpt.get('report_id','')}",
+            f"  Generated: {rpt.get('generated_at','')}",
+            f"  Quality Score: {rpt.get('report_quality',{}).get('score',0)}/100",
+            "=" * 70, "",
+            "EXECUTIVE SUMMARY", "-" * 40,
+            rpt.get("executive_summary", ""), "",
+            "RISK SUMMARY", "-" * 40,
+        ]
+        rs = rpt.get("statistics", {}).get("risk_summary", {})
+        lines += [
+            f"  Level: {rs.get('level','?').upper()} | Score: {rs.get('score',0)}/100",
+            f"  Critical: {rs.get('critical',0)} | High: {rs.get('high',0)} | Medium: {rs.get('medium',0)}",
+            f"  Max CVSS: {rs.get('max_cvss',0)}",
+            "",
+            "VALIDATION LOG", "-" * 40,
+        ]
+        for vl in rpt.get("validation_log", []):
+            lines.append(
+                f"  [L{vl['layer']}] {vl['name']}: "
+                f"passed={vl['passed']} failed={vl['failed']}"
+                + (f" | {vl['notes'][:80]}" if vl.get("notes") else "")
+            )
+        return "\n".join(lines), 200, {"Content-Type": "text/plain"}
+    return jsonify({"error": "Use format=json or format=txt"}), 400
     
 @app.route('/about')
 def about():
