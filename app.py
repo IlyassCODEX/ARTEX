@@ -64,6 +64,7 @@ from core.vuln_scanner import VulnScanner
 from core.ratelimit_bypass import RateLimitBypass
 from core.cors_tester import CorsTester
 from core.batch_manager import batch_manager, BatchManager
+from core.evidence_manager import evidence_manager
 from modules.AI_batch_orchestrator import AIBatchOrchestrator
 import threading
 import os
@@ -1253,6 +1254,52 @@ def export_narrative(scan_id):
         'Content-Type': 'application/json',
         'Content-Disposition': f'attachment; filename=narrative_{scan_id[:8]}.json',
     }
+    
+@app.route('/evidence/<batch_id>')
+def evidence_list(batch_id):
+    limit  = int(request.args.get('limit', 200))
+    offset = int(request.args.get('offset', 0))
+    sev    = request.args.get('severity')
+    verdict = request.args.get('verdict')
+    recs   = evidence_manager.query(
+        batch_id=batch_id, severity=sev,
+        verdict=verdict, limit=limit, offset=offset,
+    )
+    return jsonify({
+        'records': [r.to_dict(include_raw=False) for r in recs],
+        'count':   len(recs),
+        'stats':   evidence_manager.stats(batch_id),
+        'chain':   evidence_manager.verify_chain(batch_id),
+    })
+    
+@app.route('/evidence/<batch_id>/<evidence_id>')
+def evidence_detail(batch_id, evidence_id):
+    rec = evidence_manager.get(evidence_id)
+    if not rec or rec.batch_id != batch_id:
+        return jsonify({'error': 'Not found'}), 404
+    return jsonify(rec.to_dict(include_raw=True))
+
+@app.route('/evidence/export/<batch_id>')
+def evidence_export(batch_id):
+    fmt = request.args.get('format', 'json')
+    if fmt == 'csv':
+        return evidence_manager.export_csv(batch_id=batch_id), 200, {
+            'Content-Type':        'text/csv',
+            'Content-Disposition': f'attachment; filename=evidence_{batch_id[:8]}.csv',
+        }
+    if fmt == 'txt':
+        return evidence_manager.export_txt(batch_id=batch_id), 200, {
+            'Content-Type':        'text/plain',
+            'Content-Disposition': f'attachment; filename=evidence_{batch_id[:8]}.txt',
+        }
+    return evidence_manager.export_json(batch_id=batch_id), 200, {
+        'Content-Type':        'application/json',
+        'Content-Disposition': f'attachment; filename=evidence_{batch_id[:8]}.json',
+    }
+
+@app.route('/evidence/chain/verify/<batch_id>')
+def evidence_chain_verify(batch_id):
+    return jsonify(evidence_manager.verify_chain(batch_id))
     
 @app.route('/about')
 def about():
