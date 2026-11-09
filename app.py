@@ -67,6 +67,7 @@ from core.cors_tester import CorsTester
 from core.batch_manager import batch_manager, BatchManager
 from core.evidence_manager import evidence_manager
 from modules.AI_batch_orchestrator import AIBatchOrchestrator
+from modules.AI__remediation_engine import AIRemediationEngine
 import threading
 import os
 
@@ -934,6 +935,13 @@ def run_scan(scan_id, domain, options):
                 scan_results=scan_results[scan_id],
             )
             scan_status[scan_id]['progress'] = 95
+            
+            engine = AIRemediationEngine(groq_api_key=GROQ_API_KEY)
+            scan_results[scan_id]['remediation_plan'] = engine.build(
+                domain=domain,
+                scan_results=scan_results[scan_id],
+            )
+            scan_status[scan_id]['progress'] = 97
             
             narrator = AIReportNarrator(groq_api_key=GROQ_API_KEY)
             scan_results[scan_id]['narrative_report'] = narrator.narrate(
