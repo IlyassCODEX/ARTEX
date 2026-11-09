@@ -26,6 +26,8 @@ from modules.network_range_mapper import NetworkRangeMapper
 from modules.jwt_analyzer import JWTAnalyzer
 from modules.smtp_enum import SMTPEnumerator
 from modules.snmp_scan import SNMPScanner
+from modules.clickjacking_checker import ClickjackingChecker
+from modules.cloud_metadata_probe import CloudMetadataProbe
 from modules.FastAnalyst import FastSecurityAnalyst
 from modules.AI_analyst import AIAnalyst
 from modules.AI_header_analyzer import AIHeaderAnalyzer
@@ -163,6 +165,8 @@ def start_scan():
         'jwt_analyzer': True,
         'smtp_enum': True,
         'snmp_scan': True,
+        'clickjacking': True,
+        'cloud_metadata': True,
     })
     
     if not validate_domain(domain):
@@ -221,6 +225,8 @@ def start_scan():
         'jwt_analyzer': {},
         'smtp_enum': {},
         'snmp_scan': {},
+        'clickjacking': {},
+        'cloud_metadata': {},
         'scan_id': scan_id,
         'timestamp': datetime.now().isoformat(),
         'options': options,
@@ -767,6 +773,33 @@ def run_scan(scan_id, domain, options):
                 except Exception as e:
                     print(f"[ssti_scanner] error: {e}")
                     scan_results[scan_id]['ssti_scanner'] = {'error': str(e)}
+                    
+            if options.get('clickjacking', True):
+                scan_status[scan_id]['current_task'] = 'Checking clickjacking protections...'
+                try:
+                    cj = ClickjackingChecker(
+                        target_url=f"https://{domain}",
+                        rate_delay=0.1,
+                        max_workers=15,
+                    )
+                    scan_results[scan_id]['clickjacking'] = cj.scan()
+                except Exception as e:
+                    print(f"[clickjacking] error: {e}")
+                    scan_results[scan_id]['clickjacking'] = {'error': str(e)}
+                    
+            if options.get('cloud_metadata', True):
+                scan_status[scan_id]['current_task'] = 'Probing cloud metadata endpoints...'
+                try:
+                    cmp = CloudMetadataProbe(
+                        target_url=f"https://{domain}",
+                        timeout=5.0,
+                        max_workers=15,
+                        rate_delay=0.15,
+                    )
+                    scan_results[scan_id]['cloud_metadata'] = cmp.scan()
+                except Exception as e:
+                    print(f"[cloud_metadata] error: {e}")
+                    scan_results[scan_id]['cloud_metadata'] = {'error': str(e)}
                     
             if options.get('vuln_score'):
                 scan_status[scan_id]['current_task'] = 'AI Vuln Scoring...'
