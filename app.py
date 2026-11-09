@@ -36,6 +36,7 @@ from modules.AI_osint_correlator import AIOSINTCorrelator
 from modules.AI_payload_generator import AIPayloadGenerator
 from modules.AI_report_narrator import AIReportNarrator
 from modules.AI_api_fuzzer import AIAPIFuzzer
+from modules.AI_cross_target_correlator import AICrossTargetCorrelator
 from utils.reporting import ReportGenerator
 from utils.helpers import validate_domain, sanitize_domain
 from utils.header_injector import run_header_injection
@@ -1300,6 +1301,15 @@ def evidence_export(batch_id):
 @app.route('/evidence/chain/verify/<batch_id>')
 def evidence_chain_verify(batch_id):
     return jsonify(evidence_manager.verify_chain(batch_id))
+    
+@app.route('/batch/correlate/<batch_id>', methods=['POST'])
+def batch_correlate(batch_id):
+    batch = batch_manager.get_batch(batch_id)
+    if not batch:
+        return jsonify({'error': 'Batch not found'}), 404
+    correlator = AICrossTargetCorrelator(groq_api_key=GROQ_API_KEY)
+    result = correlator.correlate_batch(batch)
+    return jsonify(result)
     
 @app.route('/about')
 def about():
