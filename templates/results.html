@@ -1,5 +1,11 @@
 {% extends "base.html" %}
 
+{% from 'partials/vuln_table.html'      import vuln_table %}
+{% from 'partials/port_panel.html'      import port_panel %}
+{% from 'partials/subdomain_panel.html' import subdomain_panel %}
+{% from 'partials/tech_panel.html'      import tech_panel %}
+
+
 {% block title %}Scan Results - {{ results.domain }} | ARTEX{% endblock %}
 
 {% block extra_css %}
@@ -525,6 +531,7 @@
             <div class="tab-content" id="resultsTabsContent">
                 <!-- Subdomains Tab -->
                 <div class="tab-pane fade show active" id="subdomains" role="tabpanel">
+                    {{ subdomain_panel(results.subdomains, results.takeover_analysis) }}
                     <div class="table-responsive">
                         <table class="table results-table" id="subdomainsTable">
                             <thead>
@@ -976,6 +983,7 @@
                 <!-- Ports Tab -->
                 {% if results.port_scan %}
                 <div class="tab-pane fade" id="ports" role="tabpanel">
+                    {{ port_panel(results.port_scan, scan_id) }}
                     <div class="mb-3">
                         <input type="text" class="form-control form-control-modern" id="portSearch" placeholder="Search ports or services...">
                     </div>
@@ -1131,6 +1139,7 @@
 <!-- In the Technologies Tab section, replace the current code with: -->
 {% if results.tech_detection %}
 <div class="tab-pane fade" id="tech" role="tabpanel">
+    {{ tech_panel(results.tech_detection) }}
     <div class="row">
         <!-- Technology Overview -->
         <div class="col-md-4">
@@ -1179,6 +1188,8 @@
                         </div>
                     </div>
                     {% endif %}
+                    
+                    {{ vuln_table(results) }}
                     
                     {% set cdns = [] %}
                     {% for url, tech_data in results.tech_detection.items() %}

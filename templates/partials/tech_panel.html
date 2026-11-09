@@ -1,0 +1,741 @@
+{% macro tech_panel(tech_detection) %}
+{% if tech_detection %}
+
+{# ── precompute aggregates in Jinja ── #}
+{% set ns = namespace(
+    all_tech=[],
+    cloud_seen=[],
+    clouds=[],
+    cdn_seen=[],
+    cdns=[],
+    all_secrets=[],
+    all_exposed=[],
+    all_endpoints=[]
+) %}
+{% for url, td in tech_detection.items() %}
+    {% for t in td.technologies %}
+        {% set _ = ns.all_tech.append(t) %}
+    {% endfor %}
+    {% if td.cloud and td.cloud.provider not in ns.cloud_seen %}
+        {% set _ = ns.cloud_seen.append(td.cloud.provider) %}
+        {% set _ = ns.clouds.append(td.cloud) %}
+    {% endif %}
+    {% if td.cdn and td.cdn.provider not in ns.cdn_seen %}
+        {% set _ = ns.cdn_seen.append(td.cdn.provider) %}
+        {% set _ = ns.cdns.append(td.cdn) %}
+    {% endif %}
+    {% if td.secrets %}
+        {% for s in td.secrets %}{% set _ = ns.all_secrets.append(s) %}{% endfor %}
+    {% endif %}
+    {% if td.exposed_files %}
+        {% for f in td.exposed_files %}{% set _ = ns.all_exposed.append(f) %}{% endfor %}
+    {% endif %}
+    {% if td.endpoints %}
+        {% for e in td.endpoints %}{% set _ = ns.all_endpoints.append(e) %}{% endfor %}
+    {% endif %}
+{% endfor %}
+
+<style>
+    /* ── toolbar ── */
+    .tp-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: .75rem;
+        margin-bottom: 1.25rem;
+    }
+    .tp-search {
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: .4rem .9rem;
+        font-size: .83rem;
+        outline: none;
+        min-width: 220px;
+        transition: border-color .2s;
+    }
+    .tp-search:focus { border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(67,97,238,.12); }
+
+    .tp-filter-row { display: flex; gap: .4rem; flex-wrap: wrap; }
+    .tp-fbtn {
+        padding: .28rem .75rem;
+        border-radius: 20px;
+        border: 1.5px solid #e2e8f0;
+        background: white;
+        font-size: .74rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all .15s;
+        white-space: nowrap;
+        color: #475569;
+    }
+    .tp-fbtn:hover, .tp-fbtn.tp-active {
+        border-color: var(--primary-color);
+        color: var(--primary-color);
+        background: var(--primary-light);
+    }
+
+    /* ── summary strip ── */
+    .tp-summary {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .6rem;
+        margin-bottom: 1.5rem;
+    }
+    .tp-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: .28rem .8rem;
+        border-radius: 20px;
+        font-size: .76rem;
+        font-weight: 700;
+        background: white;
+        box-shadow: var(--box-shadow);
+    }
+
+    /* ── overview grid ── */
+    .tp-overview {
+        display: grid;
+        grid-template-columns: 260px 1fr;
+        gap: 1.1rem;
+        margin-bottom: 1.75rem;
+        align-items: start;
+    }
+    @media (max-width: 700px) { .tp-overview { grid-template-columns: 1fr; } }
+
+    /* ── sidebar cards ── */
+    .tp-side-card {
+        background: white;
+        border-radius: 10px;
+        box-shadow: var(--box-shadow);
+        overflow: hidden;
+        margin-bottom: .85rem;
+    }
+    .tp-side-header {
+        padding: .75rem 1rem;
+        background: var(--primary-light);
+        font-size: .78rem;
+        font-weight: 700;
+        color: var(--dark-color);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        border-bottom: 1px solid rgba(67,97,238,.12);
+    }
+    .tp-side-body { padding: .9rem 1rem; }
+
+    /* alert chips inside sidebar */
+    .tp-alert-chip {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: .4rem .75rem;
+        border-radius: 8px;
+        font-size: .78rem;
+        font-weight: 600;
+        margin-bottom: .5rem;
+    }
+    .tp-alert-chip:last-child { margin-bottom: 0; }
+    .tp-alert-danger  { background: rgba(239,68,68,.08);  color: #ef4444; }
+    .tp-alert-warning { background: rgba(245,158,11,.08); color: #f59e0b; }
+    .tp-alert-info    { background: rgba(59,130,246,.08); color: #3b82f6; }
+    .tp-alert-success { background: rgba(16,185,129,.08); color: #10b981; }
+
+    /* confidence bar */
+    .tp-conf-bar {
+        height: 4px;
+        background: #e2e8f0;
+        border-radius: 2px;
+        overflow: hidden;
+        margin-top: 4px;
+    }
+    .tp-conf-fill {
+        height: 100%;
+        border-radius: 2px;
+        background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+    }
+
+    /* ── tech tag cloud ── */
+    .tp-tag-cloud {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .4rem;
+    }
+    .tp-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: .22rem .7rem;
+        border-radius: 20px;
+        font-size: .75rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all .15s;
+        border: 1.5px solid transparent;
+    }
+    .tp-tag:hover { filter: brightness(.92); }
+    .tp-tag.tp-tag-dim { opacity: .35; }
+
+    /* category colours */
+    .tp-cat-web_servers   { background:rgba(67,97,238,.1);  color:var(--primary-color); border-color:rgba(67,97,238,.2); }
+    .tp-cat-frameworks    { background:rgba(16,185,129,.1); color:#10b981;              border-color:rgba(16,185,129,.2); }
+    .tp-cat-cms           { background:rgba(245,158,11,.1); color:#f59e0b;              border-color:rgba(245,158,11,.2); }
+    .tp-cat-javascript    { background:rgba(234,179,8,.1);  color:#ca8a04;              border-color:rgba(234,179,8,.2); }
+    .tp-cat-analytics     { background:rgba(139,92,246,.1); color:#8b5cf6;              border-color:rgba(139,92,246,.2); }
+    .tp-cat-cdn           { background:rgba(6,182,212,.1);  color:#0891b2;              border-color:rgba(6,182,212,.2); }
+    .tp-cat-cloud         { background:rgba(59,130,246,.1); color:#3b82f6;              border-color:rgba(59,130,246,.2); }
+    .tp-cat-security      { background:rgba(239,68,68,.1);  color:#ef4444;              border-color:rgba(239,68,68,.2); }
+    .tp-cat-other         { background:#f1f5f9;              color:#64748b;              border-color:#e2e8f0; }
+
+    /* ── URL accordion ── */
+    .tp-url-card {
+        background: white;
+        border-radius: 10px;
+        box-shadow: var(--box-shadow);
+        margin-bottom: .85rem;
+        overflow: hidden;
+        transition: var(--transition);
+    }
+    .tp-url-card.tp-hidden { display: none; }
+    .tp-url-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: .5rem;
+        padding: .95rem 1.15rem;
+        cursor: pointer;
+        background: #f8fafc;
+        border-bottom: 1px solid transparent;
+        transition: background .15s;
+    }
+    .tp-url-header:hover { background: #f1f5f9; }
+    .tp-url-header.tp-open { border-bottom-color: #e2e8f0; background: #f1f5f9; }
+
+    .tp-url-left { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; min-width: 0; }
+    .tp-url-name {
+        font-size: .86rem;
+        font-weight: 600;
+        color: var(--primary-color);
+        word-break: break-all;
+    }
+    .tp-url-badges { display: flex; gap: .35rem; flex-wrap: wrap; }
+
+    .tp-ubadge {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        padding: .15rem .55rem;
+        border-radius: 12px;
+        font-size: .7rem;
+        font-weight: 700;
+    }
+    .tp-ubadge-primary { background: var(--primary-light); color: var(--primary-color); }
+    .tp-ubadge-danger  { background: rgba(239,68,68,.1);  color: #ef4444; }
+    .tp-ubadge-warning { background: rgba(245,158,11,.1); color: #f59e0b; }
+    .tp-ubadge-info    { background: rgba(59,130,246,.1);  color: #3b82f6; }
+
+    .tp-toggle-icon { color: #94a3b8; font-size: .9rem; transition: transform .2s; flex-shrink: 0; }
+    .tp-url-header.tp-open .tp-toggle-icon { transform: rotate(180deg); }
+
+    .tp-url-body { display: none; padding: 1.15rem; }
+    .tp-url-body.tp-open { display: block; }
+
+    /* ── inner sections ── */
+    .tp-section-label {
+        font-size: .72rem;
+        font-weight: 700;
+        letter-spacing: .07em;
+        text-transform: uppercase;
+        color: var(--primary-color);
+        margin-bottom: .6rem;
+        margin-top: .9rem;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+    .tp-section-label:first-child { margin-top: 0; }
+
+    /* cloud/cdn info row */
+    .tp-infra-row {
+        display: flex;
+        gap: .75rem;
+        flex-wrap: wrap;
+        margin-bottom: .75rem;
+    }
+    .tp-infra-pill {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: .4rem .9rem;
+        border-radius: 8px;
+        font-size: .8rem;
+        font-weight: 600;
+    }
+    .tp-infra-cloud { background: rgba(59,130,246,.08); color: #3b82f6; }
+    .tp-infra-cdn   { background: rgba(6,182,212,.08);  color: #0891b2; }
+    .tp-infra-pill small { font-weight: 400; color: currentColor; opacity: .75; }
+
+    /* secrets table */
+    .tp-secrets-table, .tp-endpoints-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: .8rem;
+        margin-top: .4rem;
+    }
+    .tp-secrets-table thead th, .tp-endpoints-table thead th {
+        background: var(--primary-light);
+        color: var(--dark-color);
+        font-weight: 650;
+        font-size: .72rem;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+        padding: .6rem .9rem;
+        border-bottom: 2px solid rgba(67,97,238,.12);
+        white-space: nowrap;
+    }
+    .tp-secrets-table td, .tp-endpoints-table td {
+        padding: .6rem .9rem;
+        border-bottom: 1px solid #f1f5f9;
+        vertical-align: middle;
+    }
+    .tp-secrets-table tr:last-child td,
+    .tp-endpoints-table tr:last-child td { border-bottom: none; }
+
+    .tp-secret-type {
+        display: inline-block;
+        padding: .15rem .55rem;
+        border-radius: 8px;
+        background: rgba(239,68,68,.08);
+        color: #ef4444;
+        font-size: .72rem;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+    .tp-code-snippet {
+        font-family: 'Courier New', monospace;
+        font-size: .74rem;
+        background: #f8fafc;
+        padding: .25rem .55rem;
+        border-radius: 5px;
+        color: #475569;
+        max-width: 240px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        display: block;
+    }
+    .tp-method-pill {
+        display: inline-block;
+        padding: .12rem .5rem;
+        border-radius: 6px;
+        font-size: .7rem;
+        font-weight: 700;
+        font-family: monospace;
+    }
+    .tp-method-get  { background:rgba(16,185,129,.1); color:#10b981; }
+    .tp-method-post { background:rgba(67,97,238,.1);  color:var(--primary-color); }
+    .tp-method-put  { background:rgba(245,158,11,.1); color:#f59e0b; }
+    .tp-method-delete { background:rgba(239,68,68,.1); color:#ef4444; }
+    .tp-method-other  { background:#f1f5f9; color:#64748b; }
+
+    /* exposed files */
+    .tp-file-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: .5rem;
+        padding: .45rem 0;
+        border-bottom: 1px solid #f1f5f9;
+        font-size: .78rem;
+    }
+    .tp-file-row:last-child { border-bottom: none; }
+    .tp-file-row a { color: var(--primary-color); font-weight: 600; word-break: break-all; }
+    .tp-ct-badge {
+        font-size: .7rem;
+        padding: .12rem .45rem;
+        border-radius: 6px;
+        background: #f1f5f9;
+        color: #64748b;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+
+    /* ── empty ── */
+    .tp-empty {
+        text-align: center;
+        padding: 2.5rem;
+        color: #94a3b8;
+    }
+    .tp-empty i { display: block; font-size: 2rem; margin-bottom: .5rem; color: #cbd5e1; }
+</style>
+
+{# ── TOOLBAR ── #}
+<div class="tp-toolbar">
+    <div class="tp-filter-row">
+        <button class="tp-fbtn tp-active" data-tpcat="all"         onclick="tpFilter(this)">All URLs</button>
+        <button class="tp-fbtn"           data-tpcat="secrets"      onclick="tpFilter(this)">
+            Has Secrets{% if ns.all_secrets %} ({{ ns.all_secrets|length }}){% endif %}
+        </button>
+        <button class="tp-fbtn"           data-tpcat="cloud"        onclick="tpFilter(this)">Cloud</button>
+        <button class="tp-fbtn"           data-tpcat="cdn"          onclick="tpFilter(this)">CDN</button>
+        {% if ns.all_exposed %}
+        <button class="tp-fbtn" style="border-color:#f59e0b;color:#f59e0b;"
+                data-tpcat="exposed" onclick="tpFilter(this)">
+            Exposed Files ({{ ns.all_exposed|length }})
+        </button>
+        {% endif %}
+    </div>
+    <input class="tp-search" id="tpSearch" type="text" placeholder="Search URL, tech, secret…">
+</div>
+
+{# ── SUMMARY STRIP ── #}
+<div class="tp-summary">
+    <span class="tp-chip" style="color:var(--primary-color);">
+        <i class="bi bi-stack"></i>{{ ns.all_tech|length }} technologies
+    </span>
+    <span class="tp-chip" style="color:#475569;">
+        <i class="bi bi-globe"></i>{{ tech_detection|length }} URL{{ 's' if tech_detection|length != 1 }}
+    </span>
+    {% if ns.clouds %}
+    <span class="tp-chip" style="color:#3b82f6;">
+        <i class="bi bi-cloud-fill"></i>{{ ns.clouds|length }} cloud provider{{ 's' if ns.clouds|length != 1 }}
+    </span>
+    {% endif %}
+    {% if ns.cdns %}
+    <span class="tp-chip" style="color:#0891b2;">
+        <i class="bi bi-speedometer2"></i>{{ ns.cdns|length }} CDN{{ 's' if ns.cdns|length != 1 }}
+    </span>
+    {% endif %}
+    {% if ns.all_secrets %}
+    <span class="tp-chip" style="color:#ef4444;">
+        <i class="bi bi-key-fill"></i>{{ ns.all_secrets|length }} secret{{ 's' if ns.all_secrets|length != 1 }} found
+    </span>
+    {% endif %}
+    {% if ns.all_exposed %}
+    <span class="tp-chip" style="color:#f59e0b;">
+        <i class="bi bi-file-earmark-excel-fill"></i>{{ ns.all_exposed|length }} exposed file{{ 's' if ns.all_exposed|length != 1 }}
+    </span>
+    {% endif %}
+</div>
+
+{# ── OVERVIEW GRID ── #}
+<div class="tp-overview">
+
+    {# LEFT SIDEBAR #}
+    <div>
+        {# Alert flags #}
+        {% if ns.all_secrets or ns.all_exposed %}
+        <div class="tp-side-card">
+            <div class="tp-side-header"><i class="bi bi-exclamation-triangle-fill" style="color:#ef4444;"></i>Findings</div>
+            <div class="tp-side-body">
+                {% if ns.all_secrets %}
+                <div class="tp-alert-chip tp-alert-danger">
+                    <i class="bi bi-key-fill"></i>{{ ns.all_secrets|length }} secret{{ 's' if ns.all_secrets|length != 1 }} in JS files
+                </div>
+                {% endif %}
+                {% if ns.all_exposed %}
+                <div class="tp-alert-chip tp-alert-warning">
+                    <i class="bi bi-file-earmark-excel-fill"></i>{{ ns.all_exposed|length }} exposed file{{ 's' if ns.all_exposed|length != 1 }}
+                </div>
+                {% endif %}
+                {% if ns.all_endpoints %}
+                <div class="tp-alert-chip tp-alert-info">
+                    <i class="bi bi-signpost-split"></i>{{ ns.all_endpoints|length }} API endpoint{{ 's' if ns.all_endpoints|length != 1 }}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        {# Cloud providers #}
+        {% if ns.clouds %}
+        <div class="tp-side-card">
+            <div class="tp-side-header"><i class="bi bi-cloud-fill" style="color:#3b82f6;"></i>Cloud</div>
+            <div class="tp-side-body">
+                {% for c in ns.clouds %}
+                <div style="margin-bottom:.6rem;">
+                    <div style="font-weight:700;font-size:.82rem;color:var(--dark-color);">{{ c.provider|upper }}</div>
+                    <div style="font-size:.75rem;color:#64748b;">{{ c.service|default('') }}</div>
+                    <div class="tp-conf-bar">
+                        <div class="tp-conf-fill" style="width:{{ c.confidence }}%;"></div>
+                    </div>
+                    <div style="font-size:.7rem;color:#94a3b8;margin-top:2px;">{{ c.confidence }}% confidence</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {# CDN providers #}
+        {% if ns.cdns %}
+        <div class="tp-side-card">
+            <div class="tp-side-header"><i class="bi bi-speedometer2" style="color:#0891b2;"></i>CDN</div>
+            <div class="tp-side-body">
+                {% for c in ns.cdns %}
+                <div style="margin-bottom:.6rem;">
+                    <div style="font-weight:700;font-size:.82rem;color:var(--dark-color);">{{ c.provider|title }}</div>
+                    <div class="tp-conf-bar">
+                        <div class="tp-conf-fill" style="width:{{ c.confidence }}%;background:linear-gradient(90deg,#0891b2,#06b6d4);"></div>
+                    </div>
+                    <div style="font-size:.7rem;color:#94a3b8;margin-top:2px;">{{ c.confidence }}% confidence</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {# Tech tag cloud #}
+        <div class="tp-side-card">
+            <div class="tp-side-header"><i class="bi bi-tags-fill"></i>All Technologies</div>
+            <div class="tp-side-body">
+                <div class="tp-tag-cloud" id="tpTagCloud">
+                {% set seen_names = [] %}
+                {% for t in ns.all_tech %}
+                    {% if t.name not in seen_names %}
+                        {% set _ = seen_names.append(t.name) %}
+                        {% set cat = t.category|default('other')|lower|replace(' ','_') %}
+                        <span class="tp-tag tp-cat-{{ cat }}"
+                              data-tpname="{{ t.name }}"
+                              onclick="tpTagClick(this)">
+                            {{ t.name }}
+                            {% if t.version %}<small style="opacity:.7;">v{{ t.version }}</small>{% endif %}
+                        </span>
+                    {% endif %}
+                {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# RIGHT: URL accordion #}
+    <div>
+        <div id="tpUrlList">
+        {% for url, td in tech_detection.items() %}
+        {% set has_secrets  = td.secrets  and td.secrets|length > 0 %}
+        {% set has_cloud    = td.cloud    is not none %}
+        {% set has_cdn      = td.cdn      is not none %}
+        {% set has_exposed  = td.exposed_files and td.exposed_files|length > 0 %}
+        {% set has_endpoints= td.endpoints and td.endpoints|length > 0 %}
+        {% set url_idx = loop.index %}
+
+        <div class="tp-url-card"
+             data-tpurl="{{ url }}"
+             data-tphas="{{ 'secrets' if has_secrets else '' }} {{ 'cloud' if has_cloud else '' }} {{ 'cdn' if has_cdn else '' }} {{ 'exposed' if has_exposed else '' }}"
+             data-tpsearchable="{{ url }} {% for t in td.technologies %}{{ t.name }} {% endfor %}{% if td.cloud %}{{ td.cloud.provider }}{% endif %}{% if has_secrets %}secrets{% endif %}">
+
+            <div class="tp-url-header" onclick="tpToggle(this)">
+                <div class="tp-url-left">
+                    <i class="bi bi-globe" style="color:var(--primary-color);flex-shrink:0;"></i>
+                    <span class="tp-url-name">{{ url }}</span>
+                    <div class="tp-url-badges">
+                        <span class="tp-ubadge tp-ubadge-primary">
+                            <i class="bi bi-stack"></i>{{ td.technologies|length }} tech{{ 's' if td.technologies|length != 1 }}
+                        </span>
+                        {% if has_secrets %}
+                        <span class="tp-ubadge tp-ubadge-danger">
+                            <i class="bi bi-key-fill"></i>{{ td.secrets|length }} secret{{ 's' if td.secrets|length != 1 }}
+                        </span>
+                        {% endif %}
+                        {% if has_exposed %}
+                        <span class="tp-ubadge tp-ubadge-warning">
+                            <i class="bi bi-file-earmark-excel-fill"></i>{{ td.exposed_files|length }} exposed
+                        </span>
+                        {% endif %}
+                        {% if has_cloud %}
+                        <span class="tp-ubadge tp-ubadge-info">
+                            <i class="bi bi-cloud-fill"></i>{{ td.cloud.provider|upper }}
+                        </span>
+                        {% endif %}
+                        {% if has_cdn %}
+                        <span class="tp-ubadge" style="background:rgba(6,182,212,.1);color:#0891b2;">
+                            <i class="bi bi-speedometer2"></i>{{ td.cdn.provider|title }}
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+                <i class="bi bi-chevron-down tp-toggle-icon"></i>
+            </div>
+
+            <div class="tp-url-body">
+
+                {# infra row #}
+                {% if has_cloud or has_cdn %}
+                <div class="tp-infra-row">
+                    {% if has_cloud %}
+                    <div class="tp-infra-pill tp-infra-cloud">
+                        <i class="bi bi-cloud-fill"></i>
+                        <span>{{ td.cloud.provider|upper }}
+                            {% if td.cloud.service %}<small>· {{ td.cloud.service }}</small>{% endif %}
+                        </span>
+                        <span style="margin-left:auto;font-size:.72rem;opacity:.8;">{{ td.cloud.confidence }}%</span>
+                    </div>
+                    {% endif %}
+                    {% if has_cdn %}
+                    <div class="tp-infra-pill tp-infra-cdn">
+                        <i class="bi bi-speedometer2"></i>
+                        <span>{{ td.cdn.provider|title }}</span>
+                        <span style="margin-left:auto;font-size:.72rem;opacity:.8;">{{ td.cdn.confidence }}%</span>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                {# technologies #}
+                <div class="tp-section-label"><i class="bi bi-stack"></i>Technologies</div>
+                <div class="tp-tag-cloud" style="margin-bottom:.75rem;">
+                {% for t in td.technologies %}
+                {% set cat = t.category|default('other')|lower|replace(' ','_') %}
+                <span class="tp-tag tp-cat-{{ cat }}" title="{{ t.category|default('') }}">
+                    {{ t.name }}
+                    {% if t.version %}<small style="opacity:.7;">v{{ t.version }}</small>{% endif %}
+                    {% if t.confidence is defined and t.confidence < 100 %}
+                    <small style="opacity:.55;">{{ t.confidence }}%</small>
+                    {% endif %}
+                </span>
+                {% endfor %}
+                </div>
+
+                {# secrets #}
+                {% if has_secrets %}
+                <div class="tp-section-label" style="color:#ef4444;"><i class="bi bi-key-fill"></i>Secrets Found</div>
+                <div style="background:rgba(239,68,68,.05);border:1px solid rgba(239,68,68,.2);border-radius:8px;padding:.75rem;margin-bottom:.75rem;font-size:.78rem;color:#ef4444;font-weight:600;">
+                    <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                    {{ td.secrets|length }} potential secret{{ 's' if td.secrets|length != 1 }} found in JavaScript files
+                </div>
+                <div style="overflow-x:auto;">
+                <table class="tp-secrets-table">
+                    <thead><tr><th>Type</th><th>File</th><th>Snippet</th></tr></thead>
+                    <tbody>
+                    {% for secret in td.secrets %}
+                    <tr>
+                        <td><span class="tp-secret-type">{{ secret.type }}</span></td>
+                        <td style="font-size:.75rem;color:#64748b;font-family:monospace;">{{ secret.file|truncate(35) }}</td>
+                        <td><span class="tp-code-snippet">{{ secret.context|truncate(80) }}</span></td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                </div>
+                {% endif %}
+
+                {# endpoints #}
+                {% if has_endpoints %}
+                <div class="tp-section-label"><i class="bi bi-signpost-split"></i>API Endpoints</div>
+                <div style="overflow-x:auto;">
+                <table class="tp-endpoints-table">
+                    <thead><tr><th>URL</th><th>Method</th><th>Source</th></tr></thead>
+                    <tbody>
+                    {% for ep in td.endpoints %}
+                    {% set m = ep.method|default('GET')|upper %}
+                    <tr>
+                        <td><a href="{{ ep.url }}" target="_blank" rel="noopener" style="font-size:.78rem;color:var(--primary-color);font-weight:600;">{{ ep.url|truncate(50) }}</a></td>
+                        <td>
+                            <span class="tp-method-pill tp-method-{{ m|lower if m in ['GET','POST','PUT','DELETE'] else 'other' }}">{{ m }}</span>
+                        </td>
+                        <td style="font-size:.75rem;color:#94a3b8;">{{ ep.source|default('')|truncate(30) }}</td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                </div>
+                {% endif %}
+
+                {# exposed files #}
+                {% if has_exposed %}
+                <div class="tp-section-label" style="color:#f59e0b;"><i class="bi bi-file-earmark-excel-fill"></i>Exposed Files</div>
+                <div style="background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.2);border-radius:8px;padding:.75rem;">
+                {% for f in td.exposed_files %}
+                <div class="tp-file-row">
+                    <a href="{{ f.url }}" target="_blank" rel="noopener">{{ f.url|truncate(60) }}</a>
+                    <span class="tp-ct-badge">{{ f.content_type|default('—') }}</span>
+                </div>
+                {% endfor %}
+                </div>
+                {% endif %}
+
+            </div>
+        </div>
+        {% endfor %}
+        </div>
+
+        <div class="tp-empty" id="tpEmpty" style="display:none;">
+            <i class="bi bi-funnel"></i>No URLs match the current filter.
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    let activeFilter = 'all';
+    let searchQ      = '';
+    let activeTag    = null;
+
+    /* ── accordion ── */
+    window.tpToggle = function (header) {
+        const body = header.nextElementSibling;
+        const open = header.classList.contains('tp-open');
+        header.classList.toggle('tp-open', !open);
+        body.classList.toggle('tp-open', !open);
+    };
+
+    /* ── filter ── */
+    window.tpFilter = function (btn) {
+        document.querySelectorAll('.tp-fbtn').forEach(b => b.classList.remove('tp-active'));
+        btn.classList.add('tp-active');
+        activeFilter = btn.dataset.tpcat;
+        apply();
+    };
+
+    document.getElementById('tpSearch').addEventListener('input', function () {
+        searchQ = this.value.toLowerCase();
+        apply();
+    });
+
+    /* ── tag cloud click ── */
+    window.tpTagClick = function (tag) {
+        const name = tag.dataset.tpname.toLowerCase();
+        if (activeTag === name) {
+            activeTag = null;
+            document.querySelectorAll('.tp-tag').forEach(t => t.classList.remove('tp-tag-dim'));
+        } else {
+            activeTag = name;
+            document.querySelectorAll('.tp-tag').forEach(t =>
+                t.classList.toggle('tp-tag-dim', t.dataset.tpname.toLowerCase() !== name));
+        }
+        apply();
+    };
+
+    function apply() {
+        const cards = document.querySelectorAll('.tp-url-card');
+        let any = false;
+        cards.forEach(card => {
+            const has        = card.dataset.tphas || '';
+            const searchable = card.dataset.tpsearchable.toLowerCase();
+
+            const filterOk =
+                activeFilter === 'all'      ? true :
+                activeFilter === 'secrets'  ? has.includes('secrets') :
+                activeFilter === 'cloud'    ? has.includes('cloud') :
+                activeFilter === 'cdn'      ? has.includes('cdn') :
+                activeFilter === 'exposed'  ? has.includes('exposed') : true;
+
+            const qOk  = !searchQ  || searchable.includes(searchQ);
+            const tagOk = !activeTag || searchable.includes(activeTag);
+
+            const show = filterOk && qOk && tagOk;
+            card.classList.toggle('tp-hidden', !show);
+            if (show) any = true;
+        });
+        document.getElementById('tpEmpty').style.display = any ? 'none' : '';
+    }
+})();
+</script>
+
+{% else %}
+<div class="alert alert-info alert-modern">
+    <i class="bi bi-info-circle me-2"></i>No technology detection data available for this scan.
+</div>
+{% endif %}
+{% endmacro %}

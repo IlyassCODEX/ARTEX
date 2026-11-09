@@ -1,0 +1,514 @@
+{% extends "base.html" %}
+
+{% block title %}Scanning {{ domain }} | ARTEX{% endblock %}
+
+{% block extra_css %}
+<style>
+    .loading-wrap {
+        min-height: 70vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem 0;
+    }
+
+    /* ── Shield pulse ── */
+    .shield-wrap {
+        position: relative;
+        width: 96px;
+        height: 96px;
+        margin-bottom: 2rem;
+    }
+
+    .shield-ring {
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        border: 3px solid var(--primary-color);
+        opacity: 0;
+        animation: ring-expand 2s ease-out infinite;
+    }
+
+    .shield-ring:nth-child(2) { animation-delay: 0.65s; }
+    .shield-ring:nth-child(3) { animation-delay: 1.3s; }
+
+    @keyframes ring-expand {
+        0%   { transform: scale(0.6); opacity: 0.6; }
+        100% { transform: scale(1.7); opacity: 0; }
+    }
+
+    .shield-icon {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--primary-light);
+        border-radius: 50%;
+        font-size: 2.5rem;
+        color: var(--primary-color);
+    }
+
+    /* ── Domain heading ── */
+    .scan-domain-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--dark-color);
+        margin-bottom: 0.3rem;
+        word-break: break-all;
+        text-align: center;
+    }
+
+    .scan-id-sub {
+        font-size: 0.78rem;
+        color: #94a3b8;
+        font-family: monospace;
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    /* ── Progress bar ── */
+    .progress-card {
+        width: 100%;
+        max-width: 560px;
+        background: white;
+        border-radius: var(--border-radius);
+        box-shadow: var(--box-shadow);
+        padding: 1.75rem 2rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .progress-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-bottom: 0.75rem;
+    }
+
+    .current-task-label {
+        font-weight: 500;
+        color: var(--dark-color);
+        font-size: 0.92rem;
+    }
+
+    .progress-pct {
+        font-weight: 700;
+        font-size: 1.1rem;
+        color: var(--primary-color);
+        min-width: 3.5rem;
+        text-align: right;
+    }
+
+    .progress-bar-track {
+        height: 10px;
+        background: #e2e8f0;
+        border-radius: 5px;
+        overflow: hidden;
+    }
+
+    .progress-bar-fill {
+        height: 100%;
+        border-radius: 5px;
+        background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+        transition: width 0.5s ease;
+    }
+
+    .progress-bar-fill.animated {
+        background-size: 200% 100%;
+        animation: shimmer 1.8s linear infinite;
+    }
+
+    @keyframes shimmer {
+        0%   { background-position: 200% center; }
+        100% { background-position: -200% center; }
+    }
+
+    /* ── Stage timeline ── */
+    .stages-card {
+        width: 100%;
+        max-width: 560px;
+        background: white;
+        border-radius: var(--border-radius);
+        box-shadow: var(--box-shadow);
+        padding: 1.5rem 2rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .stages-title {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #94a3b8;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin-bottom: 1.1rem;
+    }
+
+    .stage-row {
+        display: flex;
+        align-items: center;
+        gap: 0.85rem;
+        padding: 0.45rem 0;
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .stage-row:last-child { border-bottom: none; }
+
+    .stage-dot {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        border: 2px solid #e2e8f0;
+        background: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.7rem;
+        flex-shrink: 0;
+        color: #cbd5e1;
+        transition: all 0.3s ease;
+    }
+
+    .stage-dot.done {
+        background: var(--success-color);
+        border-color: var(--success-color);
+        color: white;
+    }
+
+    .stage-dot.active {
+        background: var(--primary-light);
+        border-color: var(--primary-color);
+        color: var(--primary-color);
+        animation: dot-pulse 1.2s ease-in-out infinite;
+    }
+
+    @keyframes dot-pulse {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(67,97,238,0.4); }
+        50%       { box-shadow: 0 0 0 5px rgba(67,97,238,0); }
+    }
+
+    .stage-label {
+        font-size: 0.88rem;
+        font-weight: 500;
+        color: #64748b;
+        flex: 1;
+    }
+
+    .stage-label.active { color: var(--primary-color); }
+    .stage-label.done   { color: var(--success-color); }
+
+    .stage-badge {
+        font-size: 0.72rem;
+        padding: 0.15rem 0.5rem;
+        border-radius: 10px;
+        font-weight: 500;
+    }
+
+    .stage-badge.done   { background: rgba(16,185,129,0.1);  color: var(--success-color); }
+    .stage-badge.active { background: rgba(67,97,238,0.1);   color: var(--primary-color); animation: dot-pulse 1.2s ease-in-out infinite;}
+    .stage-badge.wait   { background: #f1f5f9; color: #94a3b8; }
+
+    /* ── Elapsed + meta ── */
+    .meta-strip {
+        width: 100%;
+        max-width: 560px;
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+        justify-content: center;
+        margin-bottom: 1.5rem;
+    }
+
+    .meta-chip {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        background: white;
+        border-radius: var(--border-radius);
+        padding: 0.45rem 0.9rem;
+        box-shadow: var(--box-shadow);
+        font-size: 0.82rem;
+        color: #64748b;
+        font-weight: 500;
+    }
+
+    .meta-chip i { color: var(--primary-color); }
+
+    /* ── Success / Error states ── */
+    .result-card {
+        width: 100%;
+        max-width: 560px;
+        border-radius: var(--border-radius);
+        box-shadow: var(--box-shadow);
+        padding: 2rem;
+        text-align: center;
+        display: none;
+    }
+
+    .result-card.success {
+        background: rgba(16, 185, 129, 0.06);
+        border: 1.5px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .result-card.error {
+        background: rgba(239, 68, 68, 0.05);
+        border: 1.5px solid rgba(239, 68, 68, 0.25);
+    }
+
+    .result-icon {
+        font-size: 2.8rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .result-card.success .result-icon { color: var(--success-color); }
+    .result-card.error   .result-icon { color: var(--danger-color); }
+
+    .result-card h5 {
+        font-weight: 700;
+        margin-bottom: 0.35rem;
+    }
+
+    .result-card p {
+        color: #64748b;
+        font-size: 0.9rem;
+        margin-bottom: 1.25rem;
+    }
+
+    /* ── Cancel ── */
+    .cancel-link {
+        font-size: 0.82rem;
+        color: #94a3b8;
+        text-decoration: none;
+        margin-top: 0.5rem;
+    }
+
+    .cancel-link:hover { color: var(--danger-color); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="loading-wrap">
+
+    <!-- Shield animation -->
+    <div class="shield-wrap" id="shieldWrap">
+        <div class="shield-ring"></div>
+        <div class="shield-ring"></div>
+        <div class="shield-ring"></div>
+        <div class="shield-icon"><i class="bi bi-shield-lock"></i></div>
+    </div>
+
+    <!-- Domain -->
+    <div class="scan-domain-title" id="domainTitle">{{ domain or 'Loading...' }}</div>
+    <div class="scan-id-sub">{{ scan_id }}</div>
+
+    <!-- Progress card -->
+    <div class="progress-card" id="progressCard">
+        <div class="progress-header">
+            <span class="current-task-label" id="taskLabel">Initializing scan...</span>
+            <span class="progress-pct" id="pctLabel">0%</span>
+        </div>
+        <div class="progress-bar-track">
+            <div class="progress-bar-fill animated" id="progressFill" style="width: 0%;"></div>
+        </div>
+    </div>
+
+    <!-- Stage timeline -->
+    <div class="stages-card" id="stagesCard">
+        <div class="stages-title">Scan Stages</div>
+        <div id="stageList">
+            <!-- built by JS -->
+        </div>
+    </div>
+
+    <!-- Meta strip: elapsed + options -->
+    <div class="meta-strip">
+        <div class="meta-chip"><i class="bi bi-stopwatch"></i><span id="elapsedLabel">0s elapsed</span></div>
+        <div class="meta-chip" id="optionsChip" style="display:none;">
+            <i class="bi bi-sliders"></i><span id="optionsLabel"></span>
+        </div>
+    </div>
+
+    <!-- Success state -->
+    <div class="result-card success" id="successCard">
+        <div class="result-icon"><i class="bi bi-check-circle-fill"></i></div>
+        <h5>Scan Complete</h5>
+        <p>All modules finished. Results are ready.</p>
+        <a href="#" id="viewResultsBtn" class="btn btn-modern">
+            <i class="bi bi-file-earmark-bar-graph me-2"></i>View Results
+        </a>
+    </div>
+
+    <!-- Error state -->
+    <div class="result-card error" id="errorCard">
+        <div class="result-icon"><i class="bi bi-x-circle-fill"></i></div>
+        <h5>Scan Failed</h5>
+        <p id="errorMsg">An unexpected error occurred.</p>
+        <a href="/" class="btn btn-modern">
+            <i class="bi bi-arrow-counterclockwise me-2"></i>Try Again
+        </a>
+    </div>
+
+    <a href="/history" class="cancel-link" id="cancelLink">← Back to history</a>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function () {
+
+    const SCAN_ID = '{{ scan_id }}';
+
+    /* ── Stages map: progress threshold → label ── */
+    const STAGES = [
+        { threshold: 0,   label: 'Initializing',          icon: 'bi-gear' },
+        { threshold: 10,  label: 'Subdomain Enumeration',  icon: 'bi-diagram-3' },
+        { threshold: 20,  label: 'Email Enumeration',      icon: 'bi-envelope' },
+        { threshold: 30,  label: 'Port Scanning',          icon: 'bi-plug' },
+        { threshold: 40,  label: 'DNS Records',            icon: 'bi-hdd-network' },
+        { threshold: 50,  label: 'SSL Analysis',           icon: 'bi-lock' },
+        { threshold: 60,  label: 'Technology Detection',   icon: 'bi-cpu' },
+        { threshold: 70,  label: 'Security Analysis',      icon: 'bi-shield-exclamation' },
+        { threshold: 80,  label: 'Directory Brute-Force',  icon: 'bi-folder-symlink' },
+        { threshold: 90,  label: 'AI Analysis',            icon: 'bi-stars' },
+        { threshold: 100, label: 'Finalizing',             icon: 'bi-check2-all' },
+    ];
+
+    /* ── Build stage DOM ── */
+    function buildStages() {
+        const html = STAGES.map((s, i) =>
+            `<div class="stage-row" id="stage-row-${i}">
+                <div class="stage-dot" id="stage-dot-${i}">
+                    <i class="bi ${s.icon}"></i>
+                </div>
+                <span class="stage-label" id="stage-lbl-${i}">${s.label}</span>
+                <span class="stage-badge wait" id="stage-bdg-${i}">Waiting</span>
+            </div>`
+        ).join('');
+        $('#stageList').html(html);
+    }
+
+    function updateStages(progress) {
+        STAGES.forEach((s, i) => {
+            const next = STAGES[i + 1];
+            const isDone   = progress > (next ? next.threshold : 100);
+            const isActive = !isDone && progress >= s.threshold;
+
+            const dot = $(`#stage-dot-${i}`);
+            const lbl = $(`#stage-lbl-${i}`);
+            const bdg = $(`#stage-bdg-${i}`);
+
+            dot.removeClass('done active');
+            lbl.removeClass('done active');
+            bdg.removeClass('done active wait');
+
+            if (isDone) {
+                dot.addClass('done').html('<i class="bi bi-check-lg"></i>');
+                lbl.addClass('done');
+                bdg.addClass('done').text('Done');
+            } else if (isActive) {
+                dot.addClass('active');
+                lbl.addClass('active');
+                bdg.addClass('active').text('Running');
+            } else {
+                dot.html(`<i class="bi ${s.icon}"></i>`);
+                bdg.addClass('wait').text('Waiting');
+            }
+        });
+    }
+
+    /* ── Elapsed timer ── */
+    let startTs = Date.now();
+    let elapsedInterval = setInterval(function () {
+        const sec = Math.floor((Date.now() - startTs) / 1000);
+        const m   = Math.floor(sec / 60);
+        const s   = sec % 60;
+        $('#elapsedLabel').text(m > 0 ? `${m}m ${s}s elapsed` : `${s}s elapsed`);
+    }, 1000);
+
+    /* ── Polling ── */
+    let pollInterval = null;
+
+    function startPolling() {
+        pollInterval = setInterval(poll, 2000);
+        poll(); // immediate first hit
+    }
+
+    function poll() {
+        $.get('/scan_status/' + SCAN_ID)
+            .done(function (s) {
+                const pct = Math.min(100, s.progress || 0);
+
+                // progress bar
+                $('#progressFill').css('width', pct + '%');
+                $('#pctLabel').text(pct + '%');
+                $('#taskLabel').text(s.current_task || 'Processing...');
+
+                // stages
+                updateStages(pct);
+
+                // domain (if not set server-side)
+                if (s.domain) $('#domainTitle').text(s.domain);
+
+                // options chip
+                if (s.options) {
+                    const map = { subdomains:'Subdomains', ports:'Ports', dns:'DNS',
+                                  tech:'Tech', email:'Emails', ssl:'SSL', ai:'AI' };
+                    const active = Object.entries(map)
+                        .filter(([k]) => s.options[k]).map(([,v]) => v);
+                    if (active.length) {
+                        $('#optionsLabel').text(active.join(' · '));
+                        $('#optionsChip').show();
+                    }
+                }
+
+                // terminal states
+                if (s.status === 'completed') {
+                    stopPolling(true);
+                } else if (s.status === 'error') {
+                    stopPolling(false, s.error);
+                }
+            })
+            .fail(function () {
+                stopPolling(false, 'Lost connection to the server.');
+            });
+    }
+
+    function stopPolling(success, errMsg) {
+        clearInterval(pollInterval);
+        clearInterval(elapsedInterval);
+
+        // freeze progress bar
+        $('#progressFill').removeClass('animated');
+
+        if (success) {
+            // fill to 100
+            $('#progressFill').css('width', '100%');
+            $('#pctLabel').text('100%');
+            $('#taskLabel').text('Scan completed');
+            updateStages(100);
+
+            // swap shield icon to checkmark
+            $('#shieldWrap .shield-icon').html('<i class="bi bi-check-circle-fill" style="color:var(--success-color)"></i>');
+            $('#shieldWrap .shield-ring').css('border-color', 'var(--success-color)');
+
+            $('#progressCard').hide();
+            $('#stagesCard').hide();
+            $('#successCard').css('display', 'block');
+            $('#viewResultsBtn').attr('href', '/results/' + SCAN_ID);
+            $('#cancelLink').hide();
+        } else {
+            $('#shieldWrap .shield-icon').html('<i class="bi bi-x-circle-fill" style="color:var(--danger-color)"></i>');
+            $('#progressCard').hide();
+            $('#stagesCard').hide();
+            $('#errorCard').css('display', 'block');
+            if (errMsg) $('#errorMsg').text(errMsg);
+            $('#cancelLink').hide();
+        }
+    }
+
+    /* ── Init ── */
+    buildStages();
+    startPolling();
+});
+</script>
+{% endblock %}
