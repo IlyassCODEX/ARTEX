@@ -35,6 +35,7 @@ from modules.AI_attack_path_planner import AIAttackPathPlanner
 from modules.AI_osint_correlator import AIOSINTCorrelator
 from modules.AI_payload_generator import AIPayloadGenerator
 from modules.AI_report_narrator import AIReportNarrator
+from modules.AI_api_fuzzer import AIAPIFuzzer
 from utils.reporting import ReportGenerator
 from utils.helpers import validate_domain, sanitize_domain
 from utils.header_injector import run_header_injection
@@ -542,6 +543,13 @@ def run_scan(scan_id, domain, options):
                     scan_results=scan_results[scan_id],
                 )
                 scan_status[scan_id]['progress'] = 88
+                
+                fuzzer = AIAPIFuzzer(groq_api_key=GROQ_API_KEY)
+                scan_results[scan_id]['api_fuzz_results'] = fuzzer.fuzz(
+                    domain=domain,
+                    scan_results=scan_results[scan_id],
+                )
+                scan_status[scan_id]['progress'] = 90
                 
                 lr = LfiRfi()
                 scan_results[scan_id]['lfi_rfi'] = lr.run(domain=domain, scan_results=scan_results[scan_id])
