@@ -34,6 +34,7 @@ from modules.AI_vuln_prioritizer import AIVulnPrioritizer
 from modules.AI_attack_path_planner import AIAttackPathPlanner
 from modules.AI_osint_correlator import AIOSINTCorrelator
 from modules.AI_payload_generator import AIPayloadGenerator
+from modules.AI_report_narrator import AIReportNarrator
 from utils.reporting import ReportGenerator
 from utils.helpers import validate_domain, sanitize_domain
 from utils.header_injector import run_header_injection
@@ -924,6 +925,14 @@ def run_scan(scan_id, domain, options):
             )
             scan_status[scan_id]['progress'] = 95
             
+            narrator = AIReportNarrator(groq_api_key=GROQ_API_KEY)
+            scan_results[scan_id]['narrative_report'] = narrator.narrate(
+                domain=domain,
+                scan_results=scan_results[scan_id],
+                batch_id=scan_id,
+            )
+            scan_status[scan_id]['progress'] = 98
+            
             # Run AI analysis
             scan_status[scan_id]['current_task'] = 'Generating AI insights...'
             ai_analyst = AIAnalyst(GROQ_API_KEY)
@@ -1212,6 +1221,30 @@ def export_ui(scan_id):
     if scan_id in scan_status and 'duration' in scan_status[scan_id]:
         r['duration'] = scan_status[scan_id]['duration']
     return render_template('export.html', results=r, scan_id=scan_id)
+    
+@app.route('/export_narrative/<scan_id>')
+def export_narrative(scan_id):
+    if scan_id not in scan_results:
+        return jsonify({'error': 'Not found'}), 404
+    fmt = request.args.get('format', 'pdf')
+    domain = scan_results[scan_id].get('domain', 'unknown')
+    narrator = AIReportNarrator(groq_api_key=GROQ_API_KEY)
+    if fmt == 'pdf':
+        pdf = narrator.generate_pdf(domain, scan_results[scan_id], scan_id)
+        return pdf, 200, {
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': f'attachment; filename=narrative_{scan_id[:8]}.pdf',
+        }
+    if fmt == 'txt':
+        txt = narrator.generate_txt(domain, scan_results[scan_id], scan_id)
+        return txt, 200, {
+            'Content-Type': 'text/plain',
+            'Content-Disposition': f'attachment; filename=narrative_{scan_id[:8]}.txt',
+        }
+    return narrator.generate_json(domain, scan_results[scan_id], scan_id), 200, {
+        'Content-Type': 'application/json',
+        'Content-Disposition': f'attachment; filename=narrative_{scan_id[:8]}.json',
+    }
     
 @app.route('/about')
 def about():
