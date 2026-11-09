@@ -1,13 +1,11 @@
 # AI_batch_orchestrator.py
-# lang: Python 3.8+, file: modules/AI_batch_orchestrator.py
 # responsibility: Autonomous AI Red Team orchestration for batch operations.
-#   - Observe → Analyse → Plan → Assign → Execute → Verify → Reassess → Report
+#   - Observe -> Analyse -> Plan -> Assign -> Execute -> Verify -> Reassess -> Report
 #   - Calls existing ARTEX modules (SubdomainEnumerator, PortScanner, etc.)
 #   - Calls existing AI modules (AIAnalyst, FastSecurityAnalyst, etc.)
 #   - Writes results into TargetContext.scan_results
 #   - Records every decision to TargetContext.ai_decision_log
 #   - Records every tool invocation to BatchOperation.execution_log
-# DOES NOT duplicate scan logic — it drives existing modules.
 
 import threading
 import time
@@ -28,6 +26,7 @@ from modules.port_scanner   import PortScanner
 from modules.real_ip_discovery import RealIPDiscovery
 from modules.FastAnalyst    import FastSecurityAnalyst
 from modules.AI_analyst     import AIAnalyst
+from modules.AI_cross_target_correlator import AICrossTargetCorrelator
 from utils.helpers          import sanitize_domain
 from core.batch_manager     import TargetContext, BatchOperation, TARGET_STATUS
 from core.evidence_manager  import evidence_manager
@@ -667,3 +666,10 @@ class AIBatchOrchestrator:
         def worker(target: TargetContext, batch: BatchOperation) -> None:
             self.orchestrate(target, batch)
         return worker
+        
+    def run_cross_target_correlation(batch_op):
+        completed = [t for t in batch_op.targets
+                     if t.status == "completed" and t.scan_results]
+        if len(completed) >= 2:
+            correlator = AICrossTargetCorrelator(groq_api_key=GROQ_API_KEY)
+            batch_op.correlation_report = correlator.correlate_batch(batch_op)
