@@ -61,6 +61,9 @@ from core.ssrf_probe import SsrfProbe
 from core.vuln_scanner import VulnScanner
 from core.ratelimit_bypass import RateLimitBypass
 from core.cors_tester import CorsTester
+from core.batch_manager import batch_manager, BatchManager
+from modules.AI_batch_orchestrator import AIBatchOrchestrator
+import threading
 import os
 
 app = Flask(__name__)
@@ -75,6 +78,8 @@ def datetimeformat(value, format='%Y-%m-%d %H:%M:%S'):
 
 # Add Groq API key configuration (or load from environment)
 GROQ_API_KEY = os.getenv('GROQ_API_KEY')
+
+_orchestrator = AIBatchOrchestrator(groq_api_key=GROQ_API_KEY)
 
 scan_results = {}
 scan_status = {}
@@ -942,6 +947,7 @@ def run_scan(scan_id, domain, options):
         scan_status[scan_id]['progress'] = 0
         print(f"Scan error for {scan_id}: {e}")
 
+
 @app.route('/scan_status/<scan_id>')
 def get_scan_status(scan_id):
     if scan_id not in scan_status:
@@ -999,6 +1005,181 @@ def export_results(scan_id):
             'Content-Type': 'application/json',
             'Content-Disposition': f'attachment; filename=security_report_{scan_id}.json'
         }
+        
+@app.route('/batch/upload', methods=['POST'])
+def batch_upload():
+    """Parse uploaded TXT file, return preview without starting scan."""
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file uploaded'}), 400
+        
+    f = request.files['file']
+    if not f.filename.endwith('.txt'):
+        return jsonify({'error': 'Only .txt files accepted'}), 400
+        
+    context = f.read().decode('utf-8', errors='replace')
+    report  = batch_manager.parse_txt_file(content)
+    
+    # Store raw content in session for /batch/start
+    import tempfile, os
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.txt', mode='w')
+    tmp.write(content)
+    tmp.close()
+    
+    return jsonify({
+        'filename':      f.filename,
+        'valid_count':   len(report['valid_urls']),
+        'invalid_count': len(report['invalid_urls']),
+        'duplicate_count': len(report['duplicates']),
+        'total_lines':   report['total_lines'],
+        'preview':       report['valid_urls'][:20],
+        'errors':        report['parse_errors'][:10],
+        'tmp_path':      tmp.name,
+    })
+    
+    
+@app.route('/batch/start', methods=['POST'])
+def batch_start():
+    """Create and start a batch assessment."""
+    data     = request.get_json()
+    tmp_path = data.get('tmp_path', '')
+    options  = data.get('options', {})
+    filename = data.get('filename', 'targets.txt')
+
+    # Concurrency / timeout options
+    concurrency   = int(data.get('concurrency', 3))
+    target_timeout = int(data.get('target_timeout', 600))
+    allow_private  = bool(data.get('allow_private', False))
+
+    # Read temp file
+    try:
+        import os
+        with open(tmp_path, 'r') as fh:
+            content = fh.read()
+        os.unlink(tmp_path)
+    except Exception as e:
+        return jsonify({'error': f'Could not read temp file: {e}'}), 400
+
+    # Create batch manager with requested settings
+    bm = BatchManager(
+        concurrency    = concurrency,
+        target_timeout = target_timeout,
+        allow_private  = allow_private,
+    )
+    # Persist in global registry too
+    batch_manager._batches.update(bm._batches)
+
+    batch_op, parse_report = bm.create_batch(content, filename, options)
+    if not batch_op:
+        return jsonify({
+            'error':        'No valid in-scope targets found',
+            'parse_report': parse_report,
+        }), 400
+
+    # Merge into global batch_manager
+    batch_manager._batches[batch_op.batch_id] = batch_op
+
+    # Start background thread
+    worker = _orchestrator.get_worker()
+    thread = threading.Thread(
+        target  = bm.run_batch,
+        args    = (batch_op.batch_id, worker),
+        daemon  = True,
+        name    = f"batch_{batch_op.batch_id[:8]}",
+    )
+    thread.start()
+
+    return jsonify({
+        'batch_id':     batch_op.batch_id,
+        'total_targets': batch_op.total,
+        'parse_report':  parse_report,
+    })
+
+
+@app.route('/batch/status/<batch_id>')
+def batch_status(batch_id):
+    status = batch_manager.get_batch_status(batch_id)
+    if not status:
+        return jsonify({'error': 'Batch not found'}), 404
+    return jsonify(status)
+
+
+@app.route('/batch/stop/<batch_id>', methods=['POST'])
+def batch_stop(batch_id):
+    ok = batch_manager.stop_batch(batch_id)
+    return jsonify({'stopped': ok})
+
+
+@app.route('/batch/execution_log/<batch_id>')
+def batch_execution_log(batch_id):
+    limit = int(request.args.get('limit', 100))
+    log   = batch_manager.get_execution_log(batch_id, limit)
+    return jsonify({'log': log, 'count': len(log)})
+
+
+@app.route('/batch/target/<batch_id>/<target_id>')
+def batch_target_detail(batch_id, target_id):
+    target = batch_manager.get_target(batch_id, target_id)
+    if not target:
+        return jsonify({'error': 'Target not found'}), 404
+    result = target.to_dict()
+    result['scan_results'] = target.scan_results
+    return jsonify(result)
+
+
+@app.route('/batch/list')
+def batch_list():
+    return jsonify({'batches': batch_manager.list_batches()})
+
+
+@app.route('/batch/export/<batch_id>')
+def batch_export(batch_id):
+    batch = batch_manager.get_batch(batch_id)
+    if not batch:
+        return jsonify({'error': 'Batch not found'}), 404
+
+    fmt = request.args.get('format', 'json')
+
+    if fmt == 'json':
+        payload = json.dumps(batch.to_dict(), indent=2, default=str)
+        return payload, 200, {
+            'Content-Type': 'application/json',
+            'Content-Disposition': f'attachment; filename=batch_{batch_id[:8]}.json',
+        }
+
+    if fmt == 'csv':
+        import csv, io
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(['url', 'status', 'severity', 'findings', 'technologies', 'duration'])
+        for t in batch.targets:
+            w.writerow([
+                t.url, t.status, t.highest_severity or '',
+                t.findings_count, '|'.join(t.technologies[:5]), t.duration or '',
+            ])
+        return buf.getvalue(), 200, {
+            'Content-Type': 'text/csv',
+            'Content-Disposition': f'attachment; filename=batch_{batch_id[:8]}.csv',
+        }
+
+    if fmt == 'txt':
+        lines = [f"ARTEX Batch Report — {batch.batch_id}", "=" * 60]
+        lines.append(f"File: {batch.filename} | Status: {batch.status}")
+        lines.append(f"Total: {batch.total} | Done: {batch.completed} | Failed: {batch.failed}")
+        lines.append(f"Duration: {batch.duration or 'in progress'}\n")
+        for t in batch.targets:
+            lines.append(f"  [{t.status.upper():10}] {t.url}")
+            lines.append(f"    Severity: {t.highest_severity or 'n/a'} | "
+                         f"Findings: {t.findings_count} | "
+                         f"Duration: {t.duration or '...'}")
+            if t.error:
+                lines.append(f"    Error: {t.error}")
+        return "\n".join(lines), 200, {
+            'Content-Type': 'text/plain',
+            'Content-Disposition': f'attachment; filename=batch_{batch_id[:8]}.txt',
+        }
+
+    return jsonify({'error': 'Unknown format — use json, csv, or txt'}), 400
+
         
 @app.route('/history')
 def history():
